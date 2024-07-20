@@ -90,6 +90,7 @@ int canned_fs_config(const char* path, int dir,
 	if (p == NULL) {
 		return 0;
 	}
+	(void)dir;
 	*uid = p->uid;
 	*gid = p->gid;
 	*mode = p->mode;
