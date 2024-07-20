@@ -18,65 +18,74 @@ else
 	UUID_IN="$UUID_MIXED_CASE"
 fi
 
-export CFLAGS="-Wall -Wextra $CFLAGS"
-make clean && make
+if [ -z "$BUILD_DIR" ]; then
+	export BUILD_DIR=.
+fi
+mkdir -pv $BUILD_DIR
 
-dd if=/dev/zero of=blockfile bs=1M count=128
-DEV_LOOPX=$( sudo losetup -f )
-echo $DEV_LOOPX
-sudo losetup $DEV_LOOPX blockfile
+TEST_DIR=$( mktemp --tmpdir=$BUILD_DIR --directory test-XXXX )
+
+export CFLAGS="-Wall -Wextra $CFLAGS"
+make BUILD_DIR=$TEST_DIR
+
+dd if=/dev/zero of=$TEST_DIR/blockfile bs=1M count=128
+
+function setup-loopback() {
+	DEV_LOOPX=$( sudo losetup -f )
+	echo $DEV_LOOPX
+	sudo losetup $DEV_LOOPX $TEST_DIR/blockfile
+	if [[ -n "${VERBOSE}" && "${VERBOSE}" -gt 0 ]]; then
+		losetup --json --list $DEV_LOOPX
+	fi
+}
+
+setup-loopback
+FS_TARGET=$DEV_LOOPX
 
 function cleanup() {
 	sudo umount -v $DEV_LOOPX || true
 	sudo losetup -v -d $DEV_LOOPX || true
-	sudo rm -vfr \
-		blockfile \
-		test-fs-files \
-		mnt-test-fs-foo \
-		|| true
+	sudo rm -vfr $TEST_DIR || true
 	echo "cleanup complete"
 }
 trap cleanup EXIT
 
-if [[ -n "${VERBOSE}" && "${VERBOSE}" -gt 0 ]]; then
-	losetup --json --list $DEV_LOOPX
-fi
 
-mkdir -pv test-fs-files
-echo "foo" > test-fs-files/foo.txt
+mkdir -pv $TEST_DIR/test-fs-files
+echo "foo" > $TEST_DIR/test-fs-files/foo.txt
 
-mkdir -pv test-out
+mkdir -pv $TEST_DIR/test-out
 
 FS_EPOCH=1
-sudo ./make_ext4fs -v \
+sudo $TEST_DIR/make_ext4fs -v \
 	-T $FS_EPOCH \
 	-L test-fs-foo \
 	-u "$UUID_IN" \
-	$DEV_LOOPX \
-	test-fs-files \
-	| tee test-out/test-fs-foo.make_ext4fs.out
-grep "Label: test-fs-foo" test-out/test-fs-foo.make_ext4fs.out
-grep "UUID: $UUID_OUT_EXPECTED" test-out/test-fs-foo.make_ext4fs.out
+	$FS_TARGET \
+	$TEST_DIR/test-fs-files \
+	| tee $TEST_DIR/test-out/test-fs-foo.make_ext4fs.out
+grep "Label: test-fs-foo" $TEST_DIR/test-out/test-fs-foo.make_ext4fs.out
+grep "UUID: $UUID_OUT_EXPECTED" $TEST_DIR/test-out/test-fs-foo.make_ext4fs.out
 
-mkdir -pv mnt-test-fs-foo
-sudo mount $DEV_LOOPX mnt-test-fs-foo
+mkdir -pv $TEST_DIR/mnt-test-fs-foo
+sudo mount $DEV_LOOPX $TEST_DIR/mnt-test-fs-foo
 
-sudo ls -l mnt-test-fs-foo
+sudo ls -l $TEST_DIR/mnt-test-fs-foo
 
 ERRORS=0
 
 sudo diff -u \
-	test-fs-files/foo.txt \
-	mnt-test-fs-foo/foo.txt \
+	$TEST_DIR/test-fs-files/foo.txt \
+	$TEST_DIR/mnt-test-fs-foo/foo.txt \
 	|| ERRORS=$(( 1 + $ERRORS ))
 
-sudo blkid $DEV_LOOPX | tee test-out/test-fs-foo.blkid.out
+sudo blkid $DEV_LOOPX | tee $TEST_DIR/test-out/test-fs-foo.blkid.out
 grep --only-matching "LABEL=\"test-fs-foo\"" \
-	test-out/test-fs-foo.blkid.out \
+	$TEST_DIR/test-out/test-fs-foo.blkid.out \
 	|| ERRORS=$(( 1 + $ERRORS ))
 
 grep --only-matching "UUID=\"${UUID_OUT_EXPECTED}\"" \
-	test-out/test-fs-foo.blkid.out \
+	$TEST_DIR/test-out/test-fs-foo.blkid.out \
 	|| ERRORS=$(( 1 + $ERRORS ))
 
 if [ $ERRORS -gt 255 ]; then ERRORS=255; fi
