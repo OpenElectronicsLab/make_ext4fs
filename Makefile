@@ -32,6 +32,9 @@ make_ext4fs: $(OBJ) libsparse/libsparse.a
 libsparse/libsparse.a:
 	$(MAKE) -C libsparse/ libsparse.a
 
+check:
+	./build-and-test.sh
+
 clean:
 	$(MAKE) -C libsparse/ clean
 	rm -f $(OBJ) make_ext4fs
