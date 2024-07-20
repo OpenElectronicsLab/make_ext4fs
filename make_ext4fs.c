@@ -17,7 +17,7 @@
 #include "ext4_utils.h"
 #include "allocate.h"
 #include "contents.h"
-#include "uuid.h"
+#include "uuid5.h"
 #include "wipe.h"
 
 #include <sparse/sparse.h>

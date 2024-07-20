@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef UUID_H
-#define UUID_H
+#ifndef UUID5_H
+#define UUID5_H
 
 #include <stdint.h>
 

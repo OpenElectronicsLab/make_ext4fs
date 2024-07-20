@@ -14,12 +14,11 @@
  * limitations under the License.
  */
 
-#include <stdint.h>
-
 #include <string.h>
 
 #include "sha1.h"
-#include "uuid.h"
+
+#include "uuid5.h"
 
 static void sha1_hash(unsigned char sha1[SHA1_DIGEST_LENGTH],
 		      const char *namespace, const char *name)
