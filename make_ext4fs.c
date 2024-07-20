@@ -365,10 +365,10 @@ static char *canonicalize_slashes(const char *str, bool absolute)
 	return ret;
 }
 
-static char *canonicalize_abs_slashes(const char *str)
-{
-	return canonicalize_slashes(str, true);
-}
+// static char *canonicalize_abs_slashes(const char *str)
+// {
+//	return canonicalize_slashes(str, true);
+// }
 
 static char *canonicalize_rel_slashes(const char *str)
 {

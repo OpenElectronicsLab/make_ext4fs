@@ -18,7 +18,7 @@ else
 	UUID_IN="$UUID_MIXED_CASE"
 fi
 
-# export CFLAGS="-Wall -Wextra $CFLAGS"
+export CFLAGS="-Wall -Wextra $CFLAGS"
 make clean && make
 
 dd if=/dev/zero of=blockfile bs=1M count=128
