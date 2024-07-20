@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-#ifndef _UUID_H_
-#define _UUID_H_
+#ifndef UUID_H
+#define UUID_H
 
-#include "ext4_utils.h"
+#include <stdint.h>
 
-void generate_uuid(const char *namespace, const char *name, u8 result[16]);
+void uuid5_generate(uint8_t dest[16], const char *namespace, const char *name);
 
 #endif
