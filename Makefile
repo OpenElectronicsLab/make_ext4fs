@@ -20,7 +20,7 @@ OBJ := \
 	make_ext4fs_main.o \
     make_ext4fs.o \
     sha1.o \
-    uuid.o \
+    uuid5.o \
     wipe.o
 
 %.o: %.c
