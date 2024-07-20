@@ -174,7 +174,7 @@ int main(int argc, char **argv)
 	}
 
 	if (strcmp(filename, "-")) {
-		fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+		fd = open(filename, O_WRONLY | O_CREAT, 0644);
 		if (fd < 0) {
 			perror("open");
 			return EXIT_FAILURE;

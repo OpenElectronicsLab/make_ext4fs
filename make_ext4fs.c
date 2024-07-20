@@ -400,6 +400,8 @@ int make_ext4fs_internal(int fd, const char *_directory,
 		return EXIT_FAILURE;
 	}
 
+	ftruncate(fd, 0);
+
 	if (info.block_size <= 0)
 		info.block_size = compute_block_size();
 

@@ -41,8 +41,13 @@ check-device:
 	./build-and-test.sh
 	@echo SUCCESS $@
 
+.PHONY: check-blockfile
+check-blockfile:
+	DIRECT_BLOCKFILE=1 ./build-and-test.sh
+	@echo SUCCESS $@
+
 .PHONY: check
-check: check-device
+check: check-device check-blockfile
 	@echo SUCCESS $@
 
 .PHONY: clean

@@ -39,8 +39,12 @@ function setup-loopback() {
 	fi
 }
 
-setup-loopback
-FS_TARGET=$DEV_LOOPX
+if [ -n "$DIRECT_BLOCKFILE" ]; then
+	FS_TARGET=$TEST_DIR/blockfile
+else
+	setup-loopback
+	FS_TARGET=$DEV_LOOPX
+fi
 
 function cleanup() {
 	sudo umount -v $DEV_LOOPX || true
@@ -68,6 +72,9 @@ grep "Label: test-fs-foo" $TEST_DIR/test-out/test-fs-foo.make_ext4fs.out
 grep "UUID: $UUID_OUT_EXPECTED" $TEST_DIR/test-out/test-fs-foo.make_ext4fs.out
 
 mkdir -pv $TEST_DIR/mnt-test-fs-foo
+if [ -n "$DIRECT_BLOCKFILE" ]; then
+	setup-loopback
+fi
 sudo mount $DEV_LOOPX $TEST_DIR/mnt-test-fs-foo
 
 sudo ls -l $TEST_DIR/mnt-test-fs-foo
