@@ -1,0 +1,5 @@
+make_ext4fs
+test-out/
+*.o
+*.a
+*~
