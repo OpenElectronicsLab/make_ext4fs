@@ -14,48 +14,40 @@
  * limitations under the License.
  */
 
+#include <stdint.h>
+
 #include <string.h>
 
-#include <arpa/inet.h>
-
-#include "ext4_utils.h"
 #include "sha1.h"
 #include "uuid.h"
 
-/* Definition from RFC-4122 */
-struct uuid {
-	u32 time_low;
-	u16 time_mid;
-	u16 time_hi_and_version;
-	u8 clk_seq_hi_res;
-	u8 clk_seq_low;
-	u16 node0_1;
-	u32 node2_5;
-};
-
-static void sha1_hash(const char *namespace, const char *name,
-	unsigned char sha1[SHA1_DIGEST_LENGTH])
+static void sha1_hash(unsigned char sha1[SHA1_DIGEST_LENGTH],
+		      const char *namespace, const char *name)
 {
 	SHA1_CTX ctx;
 	SHA1Init(&ctx);
-	SHA1Update(&ctx, (const u8*)namespace, strlen(namespace));
-	SHA1Update(&ctx, (const u8*)name, strlen(name));
+	SHA1Update(&ctx, (const uint8_t *)namespace, strlen(namespace));
+	SHA1Update(&ctx, (const uint8_t *)name, strlen(name));
 	SHA1Final(sha1, &ctx);
 }
 
-void generate_uuid(const char *namespace, const char *name, u8 result[16])
+/* see https://www.ietf.org/rfc/rfc9562.pdf */
+void uuid5_generate(uint8_t dest[16], const char *namespace, const char *name)
 {
 	unsigned char sha1[SHA1_DIGEST_LENGTH];
-	struct uuid *uuid = (struct uuid *)result;
 
-	sha1_hash(namespace, name, (unsigned char*)sha1);
-	memcpy(uuid, sha1, sizeof(struct uuid));
+	sha1_hash(sha1, namespace, name);
+	memcpy(dest, sha1, 16);
 
-	uuid->time_low = ntohl(uuid->time_low);
-	uuid->time_mid = ntohs(uuid->time_mid);
-	uuid->time_hi_and_version = ntohs(uuid->time_hi_and_version);
-	uuid->time_hi_and_version &= 0x0FFF;
-	uuid->time_hi_and_version |= (5 << 12);
-	uuid->clk_seq_hi_res &= ~(1 << 6);
-	uuid->clk_seq_hi_res |= 1 << 7;
+	const size_t version_byte = 6;
+	const size_t variant_byte = 8;
+	// clear the upper 4 bits (version)
+	// then set the version to 5 (0b0101)
+	dest[version_byte] &= 0x0F;
+	dest[version_byte] |= (5 << 12);
+
+	// clear upper two bits (variant) of 'clk_seq_hi_res'
+	// then set variant to 2 (0b10)
+	dest[variant_byte] &= 0x3F;
+	dest[variant_byte] |= (2 << 6);
 }

@@ -445,7 +445,7 @@ int make_ext4fs_internal(int fd, const char *_directory,
 	info.bg_desc_reserve_blocks = compute_bg_desc_reserve_blocks();
 
 	if (!uuid_user_specified) {
-		generate_uuid("extandroid/make_ext4fs", info.label, info.uuid);
+		uuid5_generate(info.uuid, "extandroid/make_ext4fs", info.label);
 	}
 
 	printf("Creating filesystem with parameters:\n");
