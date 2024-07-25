@@ -1,0 +1,291 @@
+2024-07-25  Eric Herman  <eric@freesa.org>
+
+	added licenses to makefiles
+	moved top-level source files to src/
+	moved top-level test file to tests/
+	default the build/ directory
+
+	* Makefile: add license, BUILD_DIR ?= ./build
+	* libsparse/Makefile: add license, BUILD_DIR ?= ../build
+	* build-and-test.sh: move to tests/ add license comment
+	* ChangeLog: added
+	* .gitignore: updated
+	* allocate.c: moved to src/allocate.c
+	* allocate.h: moved to src/allocate.h
+	* canned_fs_config.c: moved to src/canned_fs_config.c
+	* canned_fs_config.h: moved to src/canned_fs_config.h
+	* contents.c: moved to src/contents.c
+	* contents.h: moved to src/contents.h
+	* crc16.c: moved to src/crc16.c
+	* ext4.h: moved to src/ext4.h
+	* ext4_extents.h: moved to src/ext4_extents.h
+	* ext4_kernel_headers.h: moved to src/ext4_kernel_headers.h
+	* ext4_sb.c: moved to src/ext4_sb.c
+	* ext4_sb.h: moved to src/ext4_sb.h
+	* ext4_utils.c: moved to src/ext4_utils.c
+	* ext4_utils.h: moved to src/ext4_utils.h
+	* ext4fixup.c: moved to src/ext4fixup.c
+	* ext4fixup.h: moved to src/ext4fixup.h
+	* extent.c: moved to src/extent.c
+	* extent.h: moved to src/extent.h
+	* indirect.c: moved to src/indirect.c
+	* indirect.h: moved to src/indirect.h
+	* jbd2.h: moved to src/jbd2.h
+	* make_ext4fs.c: moved to src/make_ext4fs.c
+	* make_ext4fs_main.c: moved to src/make_ext4fs_main.c
+	* sha1.c: moved to src/sha1.c
+	* sha1.h: moved to src/sha1.h
+	* uuid5.c: moved to src/uuid5.c
+	* uuid5.h: moved to src/uuid5.h
+	* wipe.c: moved to src/wipe.c
+	* wipe.h: moved to src/wipe.h
+	* xattr.h: moved to src/xattr.h
+
+2024-07-20  Eric Herman  <eric@freesa.org>
+
+	Align uuid v5 generation with rfc9562
+	support using a file (in addition to device) for target
+	move file truncation until after file size check
+	support BUILD_DIR
+	fix declare-but-not-used warnings
+	add a .gitignore
+	Makefile: add "check" target
+	rename uuid.h,uuid.c to uuid5.h, uuid5.c
+
+	* make_ext4fs_main.c: remove file truncation on open
+	* make_ext4fs.c: file truncation after getting file size
+	* build-and-test.sh: support BUILD_DIR, file or device
+	* Makefile: add a "check" for both file/device, BUILD_DIR, whitespace
+	* libsparse/Makefile: BUILD_DIR
+	* canned_fs_config.c: fix unused warning
+	* make_ext4fs.c: fix unused warning
+	* uuid.h: rename to uuid5.h
+	* uuid.c: Align with rfc9562, rename to uuid5.c
+	* build-and-test.sh: called from "make check"
+	* .gitignore: added
+
+2024-05-06  Eric Herman  <eric@freesa.org>
+
+	make_ext4fs: add command-line -u option for UUID
+
+	* ext4_utils.h: parsing functions
+	* make_ext4fs_main.c: commandline parsing
+	* ext4_sb.c:
+	* make_ext4fs.c
+	* ext4_sb.h
+	* ext4_utils.c
+
+2020-01-05  Hauke Mehrtens  <hauke@hauke-m.de>
+
+	Add LDFLAGS when building libsparse.a
+
+	* Makefile
+
+2019-12-06  Johannes Kimmel  <freifunk@mail.bareminimum.eu>
+
+	make_ext4fs: fix build on musl systems
+
+	* ext4_utils.h
+
+2017-05-20  Rosen Penev  <rosenp@gmail.com>
+
+	make_ext4: Add strict prototypes.
+
+	* contents.h
+	* extent.h
+	* indirect.h
+	* allocate.h
+	* make_ext4fs.c
+	* contents.c
+
+2017-04-08  Rosen Penev  <rosenp@gmail.com>
+
+	make_ext4fs: Remove off64_t in favor of standard off_t
+
+	* ext4_utils.h
+	* ext4_utils.c
+	* libsparse/sparse_read.c
+	* ext4fixup.c
+	* libsparse/output_file.c
+	* extent.c
+
+2016-08-14  Jo-Philipp Wich  <jo@mein.io>
+
+	Allow creating empty filesystem images
+
+	* make_ext4fs.c
+
+2016-05-05  Felix Fietkau  <nbd@nbd.name>
+
+	Only include sys/sysmacros.h on glibc, it is not portable
+
+	* ext4_utils.h
+
+2016-04-25  Jo-Philipp Wich  <jo@mein.io>
+
+	Include sys/sysmacros.h explicitely.
+
+	* ext4_utils.h
+
+2015-12-02  Wojtek Porczyk  <woju@invisiblethingslab.com>
+
+	make_ext4fs: explicitly call setlocale() before creating image
+
+	* make_ext4fs.c
+
+2015-09-14  Jo-Philipp Wich  <jow@openwrt.org>
+
+	Add option to link zlib statically
+
+	* Makefile
+
+2015-04-29  Imre Kaloz  <kaloz@openwrt.org>
+
+	avoid using libc's internal sys/cdefs.h
+
+	* sha1.c
+	* sha1.h
+
+2015-04-08  Jo-Philipp Wich  <jow@openwrt.org>
+
+	Allow specifying reserved blocks percentage
+	Remove MinGW support code
+	Remove unused functions
+	Remove unused mountpoint support
+
+	* contents.c
+	* ext4_sb.h
+	* ext4_utils.c
+	* ext4_utils.h
+	* ext4fixup.c
+	* libsparse/output_file.c
+	* libsparse/sparse_read.c
+	* make_ext4fs.c
+	* make_ext4fs.h
+	* make_ext4fs_main.c
+	* sha1.c
+	* sha1.h
+	* uuid.c
+
+2015-04-04  Jo-Philipp Wich  <jow@openwrt.org>
+
+	Implement support for block and char dev nodes, fifos and sockets.
+	Add required Android includes
+	Fix fs configuration support
+	Support comments in fs config
+	Support tabs as seaprators when parsing fs config
+	Add toplevel Makefile
+	libsparse: add Makefile
+	Remove Android specific code paths
+	Remove selinux code
+	Remove references to O_BINARY
+	Remove unused files
+
+	* Android.mk
+	* Makefile
+	* canned_fs_config.c
+	* canned_fs_config.h
+	* contents.c
+	* contents.h
+	* e4crypt_static.c
+	* ext2simg.c
+	* ext4_crypt.cpp
+	* ext4_crypt.h
+	* ext4_crypt_init_extensions.cpp
+	* ext4_utils.h
+	* ext4fixup_main.c
+	* include/private/android_filesystem_capability.h
+	* include/private/android_filesystem_config.h
+	* libsparse/Android.mk
+	* libsparse/Makefile
+	* libsparse/append2simg.c
+	* libsparse/img2simg.c
+	* libsparse/output_file.c
+	* libsparse/simg2img.c
+	* libsparse/simg2simg.c
+	* libsparse/simg_dump.py
+	* make_ext4fs.c
+	* make_ext4fs.h
+	* make_ext4fs_main.c
+	* mkuserimg.sh
+	* setup_fs.c
+	* test_ext4fixup
+	* unencrypted_properties.cpp
+	* unencrypted_properties.h
+
+2015-04-04  Jo-Philipp Wich  <jow@openwrt.org>
+
+	Import libsparse sources
+
+	* libsparse/simg2img.c
+	* libsparse/simg_dump.py
+	* libsparse/defs.h
+	* libsparse/backed_block.c
+	* libsparse/Android.mk
+	* libsparse/img2simg.c
+	* libsparse/sparse_err.c
+	* libsparse/sparse_crc32.h
+	* libsparse/output_file.h
+	* libsparse/sparse_format.h
+	* libsparse/backed_block.h
+	* libsparse/sparse_file.h
+	* libsparse/sparse_read.c
+	* libsparse/simg2simg.c
+	* libsparse/append2simg.c
+	* libsparse/sparse_defs.h
+	* libsparse/sparse_crc32.c
+	* libsparse/sparse.c
+	* libsparse/output_file.c
+	* libsparse/include/sparse/sparse.h
+
+
+2015-04-04  Jo-Philipp Wich  <jow@openwrt.org>
+
+	Import make_ext4fs sources
+
+	* make_ext4fs.c
+	* ext4_crypt.h
+	* contents.h
+	* make_ext4fs.h
+	* ext4fixup_main.c
+	* unencrypted_properties.h
+	* ext4_utils.c
+	* make_ext4fs_main.c
+	* indirect.c
+	* ext4_utils.h
+	* ext4.h
+	* ext4_kernel_headers.h
+	* e4crypt_static.c
+	* indirect.h
+	* extent.c
+	* uuid.c
+	* test_ext4fixup
+	* extent.h
+	* uuid.h
+	* crc16.c
+	* ext4_crypt.cpp
+	* Android.mk
+	* setup_fs.c
+	* NOTICE
+	* unencrypted_properties.cpp
+	* ext4_sb.c
+	* ext4_extents.h
+	* ext4_sb.h
+	* ext2simg.c
+	* xattr.h
+	* wipe.c
+	* wipe.h
+	* ext4_crypt_init_extensions.cpp
+	* allocate.c
+	* mkuserimg.sh
+	* sha1.c
+	* allocate.h
+	* canned_fs_config.c
+	* sha1.h
+	* canned_fs_config.h
+	* ext4fixup.c
+	* jbd2.h
+	* ext4fixup.h
+	* MODULE_LICENSE_APACHE2
+	* contents.c
+
