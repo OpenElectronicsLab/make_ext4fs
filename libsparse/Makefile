@@ -1,6 +1,6 @@
 CC ?= gcc
 AR ?= ar
-BUILD_DIR ?= .
+BUILD_DIR ?= ../build
 
 all: $(BUILD_DIR)/libsparse.a
 

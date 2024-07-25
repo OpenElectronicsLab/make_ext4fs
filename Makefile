@@ -1,7 +1,7 @@
 CC ?= gcc
 CFLAGS += -Iinclude -Ilibsparse/include
 
-BUILD_DIR ?= .
+BUILD_DIR ?= ./build
 
 ifeq ($(STATIC),1)
 	ZLIB := -Wl,-Bstatic -lz -Wl,-Bdynamic
@@ -25,7 +25,7 @@ OBJ :=	\
 	$(BUILD_DIR)/uuid5.o \
 	$(BUILD_DIR)/wipe.o
 
-$(BUILD_DIR)/%.o: %.c
+$(BUILD_DIR)/%.o: src/%.c
 	mkdir -pv $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c -o $@ $^
 
@@ -37,13 +37,13 @@ $(BUILD_DIR)/libsparse.a:
 
 
 .PHONY:check-device
-check-device:
-	./build-and-test.sh
+check-device: tests/build-and-test.sh
+	BUILD_DIR=$(BUILD_DIR) $<
 	@echo SUCCESS $@
 
 .PHONY: check-blockfile
-check-blockfile:
-	DIRECT_BLOCKFILE=1 ./build-and-test.sh
+check-blockfile: tests/build-and-test.sh
+	DIRECT_BLOCKFILE=1 BUILD_DIR=$(BUILD_DIR) $<
 	@echo SUCCESS $@
 
 .PHONY: check
@@ -53,4 +53,4 @@ check: check-device check-blockfile
 .PHONY: clean
 clean:
 	$(MAKE) -C libsparse/ BUILD_DIR=$(shell readlink -f $(BUILD_DIR)) clean
-	rm -f $(OBJ) make_ext4fs
+	rm -rfv $(OBJ) $(BUILD_DIR)/make_ext4fs $(BUILD_DIR)/test-????
