@@ -1,3 +1,8 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (C) 2015 Jo-Philipp Wich <jow@openwrt.org>
+# Modifications:
+# Copyright (C) 2024 Eric Herman <eric@freesa.org>
+
 CC ?= gcc
 AR ?= ar
 BUILD_DIR ?= ../build
