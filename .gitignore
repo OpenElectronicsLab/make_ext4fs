@@ -1,5 +1,5 @@
 make_ext4fs
-test-out/
+test-????
 *.o
 *.a
 *~
