@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (C) 2024 Eric Herman <eric@freesa.org>
 
 if [[ -n "${VERBOSE}" && "${VERBOSE}" -gt 0 ]]; then
     set -x

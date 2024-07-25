@@ -1,3 +1,9 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (C) 2015 Jo-Philipp Wich <jow@openwrt.org>
+# Modifications:
+# Copyright (C) 2020 Hauke Mehrtens <hauke@hauke-m.de>
+# Copyright (C) 2024 Eric Herman <eric@freesa.org>
+
 CC ?= gcc
 CFLAGS += -Iinclude -Ilibsparse/include
 
