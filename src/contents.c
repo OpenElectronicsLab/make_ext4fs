@@ -35,7 +35,7 @@ struct block_allocation* get_saved_allocation_chain() {
 	return saved_allocation_head;
 }
 
-static u32 dentry_size(u32 entries, struct dentry *dentries)
+static u32 dentry_size(struct fs_info *info, u32 entries, struct dentry *dentries)
 {
 	u32 len = 24;
 	unsigned int i;
@@ -43,31 +43,34 @@ static u32 dentry_size(u32 entries, struct dentry *dentries)
 
 	for (i = 0; i < entries; i++) {
 		dentry_len = 8 + EXT4_ALIGN(strlen(dentries[i].filename), 4);
-		if (len % info.block_size + dentry_len > info.block_size)
-			len += info.block_size - (len % info.block_size);
+		if (len % info->block_size + dentry_len > info->block_size)
+			len += info->block_size - (len % info->block_size);
 		len += dentry_len;
 	}
 
 	return len;
 }
 
-static struct ext4_dir_entry_2 *add_dentry(u8 *data, u32 *offset,
-		struct ext4_dir_entry_2 *prev, u32 inode, const char *name,
-		u8 file_type)
+static struct ext4_dir_entry_2 *add_dentry(struct fs_info *info,
+					   jmp_buf *setjmp_env, u8 *data,
+					   u32 *offset,
+					   struct ext4_dir_entry_2 *prev,
+					   u32 inode, const char *name,
+					   u8 file_type)
 {
 	u8 name_len = strlen(name);
 	u16 rec_len = 8 + EXT4_ALIGN(name_len, 4);
 	struct ext4_dir_entry_2 *dentry;
 
-	u32 start_block = *offset / info.block_size;
-	u32 end_block = (*offset + rec_len - 1) / info.block_size;
+	u32 start_block = *offset / info->block_size;
+	u32 end_block = (*offset + rec_len - 1) / info->block_size;
 	if (start_block != end_block) {
 		/* Adding this dentry will cross a block boundary, so pad the previous
 		   dentry to the block boundary */
 		if (!prev)
-			critical_error("no prev");
-		prev->rec_len += end_block * info.block_size - *offset;
-		*offset = end_block * info.block_size;
+			critical_error(setjmp_env, "no prev");
+		prev->rec_len += end_block * info->block_size - *offset;
+		*offset = end_block * info->block_size;
 	}
 
 	dentry = (struct ext4_dir_entry_2 *)(data + *offset);
@@ -87,8 +90,10 @@ static struct ext4_dir_entry_2 *add_dentry(u8 *data, u32 *offset,
    of each directory entry into dentries[i].inode, to be filled in later
    when the inode for the entry is allocated.  Returns the inode number of the
    new directory */
-u32 make_directory(u32 dir_inode_num, u32 entries, struct dentry *dentries,
-	u32 dirs)
+u32 make_directory(struct fs_info *info, struct fs_aux_info *aux_info,
+		   struct sparse_file *ext4_sparse_file, int force,
+		   jmp_buf *setjmp_env, u32 dir_inode_num, u32 entries,
+		   struct dentry *dentries, u32 dirs)
 {
 	struct ext4_inode *inode;
 	u32 blocks;
@@ -99,62 +104,69 @@ u32 make_directory(u32 dir_inode_num, u32 entries, struct dentry *dentries,
 	unsigned int i;
 	struct ext4_dir_entry_2 *dentry;
 
-	blocks = DIV_ROUND_UP(dentry_size(entries, dentries), info.block_size);
-	len = blocks * info.block_size;
+	blocks = DIV_ROUND_UP(dentry_size(info, entries, dentries), info->block_size);
+	len = blocks * info->block_size;
 
 	if (dir_inode_num) {
-		inode_num = allocate_inode();
+		inode_num = allocate_inode(info, aux_info);
 	} else {
 		dir_inode_num = EXT4_ROOT_INO;
 		inode_num = EXT4_ROOT_INO;
 	}
 
 	if (inode_num == EXT4_ALLOCATE_FAILED) {
-		error("failed to allocate inode\n");
+	error(force, setjmp_env, "failed to allocate inode\n");
 		return EXT4_ALLOCATE_FAILED;
 	}
 
-	add_directory(inode_num);
+	add_directory(info, aux_info, inode_num);
 
-	inode = get_inode(inode_num);
+	inode = get_inode(info, aux_info, ext4_sparse_file, force, setjmp_env,
+			  inode_num);
 	if (inode == NULL) {
-		error("failed to get inode %u", inode_num);
+	error(force, setjmp_env, "failed to get inode %u", inode_num);
 		return EXT4_ALLOCATE_FAILED;
 	}
 
-	data = inode_allocate_data_extents(inode, len, len);
+	data = inode_allocate_data_extents(info, aux_info, ext4_sparse_file,
+					   force, setjmp_env, inode, len, len);
 	if (data == NULL) {
-		error("failed to allocate %u extents", len);
+	error(force, setjmp_env, "failed to allocate %u extents", len);
 		return EXT4_ALLOCATE_FAILED;
 	}
 
 	inode->i_mode = S_IFDIR;
 	inode->i_links_count = dirs + 2;
-	inode->i_flags |= aux_info.default_i_flags;
+	inode->i_flags |= aux_info->default_i_flags;
 
 	dentry = NULL;
 
-	dentry = add_dentry(data, &offset, NULL, inode_num, ".", EXT4_FT_DIR);
+	dentry = add_dentry(info, setjmp_env, data, &offset, NULL, inode_num,
+			    ".", EXT4_FT_DIR);
 	if (!dentry) {
-		error("failed to add . directory");
+		error(force, setjmp_env, "failed to add '.' directory");
 		return EXT4_ALLOCATE_FAILED;
 	}
 
-	dentry = add_dentry(data, &offset, dentry, dir_inode_num, "..", EXT4_FT_DIR);
+	dentry = add_dentry(info, setjmp_env, data, &offset, dentry,
+			    dir_inode_num, "..", EXT4_FT_DIR);
 	if (!dentry) {
-		error("failed to add .. directory");
+		error(force, setjmp_env, "failed to add '..' directory");
 		return EXT4_ALLOCATE_FAILED;
 	}
 
 	for (i = 0; i < entries; i++) {
-		dentry = add_dentry(data, &offset, dentry, 0,
-				dentries[i].filename, dentries[i].file_type);
+		dentry = add_dentry(info, setjmp_env, data, &offset, dentry, 0,
+				    dentries[i].filename,
+				    dentries[i].file_type);
 		if (offset > len || (offset == len && i != entries - 1))
-			critical_error("internal error: dentry for %s ends at %d, past %d\n",
-				dentries[i].filename, offset, len);
+			critical_error(setjmp_env,
+				       "internal error:"
+				       " dentry for %s ends at %d, past %d\n",
+				       dentries[i].filename, offset, len);
 		dentries[i].inode = &dentry->inode;
 		if (!dentry) {
-			error("failed to add directory");
+		error(force, setjmp_env, "failed to add directory");
 			return EXT4_ALLOCATE_FAILED;
 		}
 	}
@@ -166,25 +178,32 @@ u32 make_directory(u32 dir_inode_num, u32 entries, struct dentry *dentries,
 }
 
 /* Creates a file on disk.  Returns the inode number of the new file */
-u32 make_file(const char *filename, u64 len)
+u32 make_file(struct fs_info *info, struct fs_aux_info *aux_info,
+	      struct sparse_file *ext4_sparse_file, int force,
+	      jmp_buf *setjmp_env, const char *filename, u64 len)
 {
 	struct ext4_inode *inode;
 	u32 inode_num;
 
-	inode_num = allocate_inode();
+	inode_num = allocate_inode(info, aux_info);
 	if (inode_num == EXT4_ALLOCATE_FAILED) {
-		error("failed to allocate inode\n");
+	error(force, setjmp_env, "failed to allocate inode\n");
 		return EXT4_ALLOCATE_FAILED;
 	}
 
-	inode = get_inode(inode_num);
+	inode = get_inode(info, aux_info, ext4_sparse_file, force, setjmp_env,
+			  inode_num);
 	if (inode == NULL) {
-		error("failed to get inode %u", inode_num);
+		error(force, setjmp_env, "failed to get inode %u", inode_num);
 		return EXT4_ALLOCATE_FAILED;
 	}
 
 	if (len > 0) {
-		struct block_allocation* alloc = inode_allocate_file_extents(inode, len, filename);
+		struct block_allocation *alloc;
+		alloc = inode_allocate_file_extents(info, aux_info,
+						    ext4_sparse_file,
+						    force, setjmp_env,
+						    inode, len, filename);
 		if (alloc) {
 			alloc->filename = strdup(filename);
 			alloc->next = saved_allocation_head;
@@ -194,74 +213,84 @@ u32 make_file(const char *filename, u64 len)
 
 	inode->i_mode = S_IFREG;
 	inode->i_links_count = 1;
-	inode->i_flags |= aux_info.default_i_flags;
+	inode->i_flags |= aux_info->default_i_flags;
 
 	return inode_num;
 }
 
 /* Creates a file on disk.  Returns the inode number of the new file */
-u32 make_link(const char *link)
+u32 make_link(struct fs_info *info, struct fs_aux_info *aux_info,
+	      struct sparse_file *ext4_sparse_file, int force,
+	      jmp_buf *setjmp_env, const char *link)
 {
 	struct ext4_inode *inode;
 	u32 inode_num;
 	u32 len = strlen(link);
 
-	inode_num = allocate_inode();
+	inode_num = allocate_inode(info, aux_info);
 	if (inode_num == EXT4_ALLOCATE_FAILED) {
-		error("failed to allocate inode\n");
+		error(force, setjmp_env, "failed to allocate inode\n");
 		return EXT4_ALLOCATE_FAILED;
 	}
 
-	inode = get_inode(inode_num);
+	inode = get_inode(info, aux_info, ext4_sparse_file, force, setjmp_env,
+			  inode_num);
 	if (inode == NULL) {
-		error("failed to get inode %u", inode_num);
+		error(force, setjmp_env, "failed to get inode %u", inode_num);
 		return EXT4_ALLOCATE_FAILED;
 	}
 
 	inode->i_mode = S_IFLNK;
 	inode->i_links_count = 1;
-	inode->i_flags |= aux_info.default_i_flags;
+	inode->i_flags |= aux_info->default_i_flags;
 	inode->i_size_lo = len;
 
 	if (len + 1 <= sizeof(inode->i_block)) {
 		/* Fast symlink */
 		memcpy((char*)inode->i_block, link, len);
 	} else {
-		u8 *data = inode_allocate_data_indirect(inode, info.block_size, info.block_size);
+		u8 *data = inode_allocate_data_indirect(info, aux_info,
+							ext4_sparse_file, force,
+							setjmp_env, inode,
+							info->block_size,
+							info->block_size);
 		memcpy(data, link, len);
-		inode->i_blocks_lo = info.block_size / 512;
+		inode->i_blocks_lo = info->block_size / 512;
 	}
 
 	return inode_num;
 }
 
 /* Creates a special file on disk.  Returns the inode number of the new file */
-u32 make_special(const char *path)
+u32 make_special(struct fs_info *info, struct fs_aux_info *aux_info,
+		 struct sparse_file *ext4_sparse_file, int force,
+		 jmp_buf *setjmp_env, const char *path)
 {
 	struct ext4_inode *inode;
 	struct stat s;
 	u32 inode_num;
 
 	if (stat(path, &s)) {
-		error("failed to stat file\n");
+		error(force, setjmp_env, "failed to stat file\n");
 		return EXT4_ALLOCATE_FAILED;
 	}
 
-	inode_num = allocate_inode();
+	inode_num = allocate_inode(info, aux_info);
 	if (inode_num == EXT4_ALLOCATE_FAILED) {
-		error("failed to allocate inode\n");
+		error(force, setjmp_env, "failed to allocate inode\n");
 		return EXT4_ALLOCATE_FAILED;
 	}
 
-	inode = get_inode(inode_num);
+	inode = get_inode(info, aux_info, ext4_sparse_file, force, setjmp_env,
+			  inode_num);
 	if (inode == NULL) {
-		error("failed to get inode %u", inode_num);
+		error(force, setjmp_env, "failed to get inode %u", inode_num);
 		return EXT4_ALLOCATE_FAILED;
 	}
 
 	inode->i_mode = s.st_mode & S_IFMT;
 	inode->i_links_count = 1;
-	inode->i_flags |= aux_info.default_i_flags;
+	inode->i_flags |= aux_info->default_i_flags;
 
 	((u8 *)inode->i_block)[0] = major(s.st_rdev);
 	((u8 *)inode->i_block)[1] = minor(s.st_rdev);
@@ -269,9 +298,13 @@ u32 make_special(const char *path)
 	return inode_num;
 }
 
-int inode_set_permissions(u32 inode_num, u16 mode, u16 uid, u16 gid, u32 mtime)
+int inode_set_permissions(struct fs_info *info, struct fs_aux_info *aux_info,
+			  struct sparse_file *ext4_sparse_file, int force,
+			  jmp_buf *setjmp_env, u32 inode_num, u16 mode, u16 uid,
+			  u16 gid, u32 mtime)
 {
-	struct ext4_inode *inode = get_inode(inode_num);
+	struct ext4_inode *inode = get_inode(info, aux_info, ext4_sparse_file,
+					     force, setjmp_env, inode_num);
 
 	if (!inode)
 		return -1;
@@ -290,7 +323,8 @@ int inode_set_permissions(u32 inode_num, u16 mode, u16 uid, u16 gid, u32 mtime)
  * Returns the amount of free space available in the specified
  * xattr region
  */
-static size_t xattr_free_space(struct ext4_xattr_entry *entry, char *end)
+static size_t xattr_free_space(int force, jmp_buf *setjmp_env,
+			       struct ext4_xattr_entry *entry, char *end)
 {
 	while(!IS_LAST_ENTRY(entry) && (((char *) entry) < end)) {
 		end   -= EXT4_XATTR_SIZE(le32_to_cpu(entry->e_value_size));
@@ -298,7 +332,7 @@ static size_t xattr_free_space(struct ext4_xattr_entry *entry, char *end)
 	}
 
 	if (((char *) entry) > end) {
-		error("unexpected read beyond end of xattr space");
+	error(force, setjmp_env, "unexpected read beyond end of xattr space");
 		return 0;
 	}
 
@@ -335,7 +369,8 @@ static struct ext4_xattr_entry* xattr_get_last(struct ext4_xattr_entry *entry)
  * This method is intended to implement the sorting function defined in
  * the Linux kernel file fs/ext4/xattr.c function ext4_xattr_find_entry().
  */
-static void xattr_assert_sane(struct ext4_xattr_entry *entry)
+static void xattr_assert_sane(int force, jmp_buf *setjmp_env,
+			      struct ext4_xattr_entry *entry)
 {
 	for( ; !IS_LAST_ENTRY(entry); entry = EXT4_XATTR_NEXT(entry)) {
 		struct ext4_xattr_entry *next = EXT4_XATTR_NEXT(entry);
@@ -349,11 +384,11 @@ static void xattr_assert_sane(struct ext4_xattr_entry *entry)
 		if (cmp == 0)
 			cmp = memcmp(next->e_name, entry->e_name, next->e_name_len);
 		if (cmp < 0) {
-			error("BUG: extended attributes are not sorted\n");
+		error(force, setjmp_env, "BUG: extended attributes are not sorted\n");
 			return;
 		}
 		if (cmp == 0) {
-			error("BUG: duplicate extended attributes detected\n");
+		error(force, setjmp_env, "BUG: duplicate extended attributes detected\n");
 			return;
 		}
 	}
@@ -392,6 +427,7 @@ static void ext4_xattr_hash_entry(struct ext4_xattr_header *header,
 #undef VALUE_HASH_SHIFT
 
 static struct ext4_xattr_entry* xattr_addto_range(
+		int force, jmp_buf *setjmp_env,
 		void *block_start,
 		void *block_end,
 		struct ext4_xattr_entry *first,
@@ -404,7 +440,8 @@ static struct ext4_xattr_entry* xattr_addto_range(
 	if (name_len > 255)
 		return NULL;
 
-	size_t available_size = xattr_free_space(first, block_end);
+	size_t available_size = xattr_free_space(force, setjmp_env,
+						 first, block_end);
 	size_t needed_size = EXT4_XATTR_LEN(name_len) + EXT4_XATTR_SIZE(value_len);
 
 	if (needed_size > available_size)
@@ -426,19 +463,22 @@ static struct ext4_xattr_entry* xattr_addto_range(
 	memset(val, 0, EXT4_XATTR_SIZE(value_len));
 	memcpy(val, value, value_len);
 
-	xattr_assert_sane(first);
+	xattr_assert_sane(force, setjmp_env, first);
 	return new_entry;
 }
 
-static int xattr_addto_inode(struct ext4_inode *inode, int name_index,
-		const char *name, const void *value, size_t value_len)
+static int xattr_addto_inode(struct fs_info *info, int force,
+			     jmp_buf *setjmp_env, struct ext4_inode *inode,
+			     int name_index, const char *name,
+			     const void *value, size_t value_len)
 {
 	struct ext4_xattr_ibody_header *hdr = (struct ext4_xattr_ibody_header *) (inode + 1);
 	struct ext4_xattr_entry *first = (struct ext4_xattr_entry *) (hdr + 1);
-	char *block_end = ((char *) inode) + info.inode_size;
+	char *block_end = ((char *) inode) + info->inode_size;
 
-	struct ext4_xattr_entry *result =
-		xattr_addto_range(first, block_end, first, name_index, name, value, value_len);
+	struct ext4_xattr_entry *result;
+	result = xattr_addto_range(force, setjmp_env, first, block_end, first,
+				   name_index, name, value, value_len);
 
 	if (result == NULL)
 		return -1;
@@ -449,18 +489,25 @@ static int xattr_addto_inode(struct ext4_inode *inode, int name_index,
 	return 0;
 }
 
-static int xattr_addto_block(struct ext4_inode *inode, int name_index,
+static int xattr_addto_block(struct fs_info *info, struct fs_aux_info *aux_info,
+		struct sparse_file *ext4_sparse_file, int force,
+		jmp_buf *setjmp_env, struct ext4_inode *inode, int name_index,
 		const char *name, const void *value, size_t value_len)
 {
-	struct ext4_xattr_header *header = get_xattr_block_for_inode(inode);
+	struct ext4_xattr_header *header = get_xattr_block_for_inode(info,
+					     aux_info, ext4_sparse_file, force,
+					     setjmp_env, inode);
 	if (!header)
 		return -1;
 
 	struct ext4_xattr_entry *first = (struct ext4_xattr_entry *) (header + 1);
-	char *block_end = ((char *) header) + info.block_size;
+	char *block_end = ((char *) header) + info->block_size;
 
-	struct ext4_xattr_entry *result =
-		xattr_addto_range(header, block_end, first, name_index, name, value, value_len);
+	struct ext4_xattr_entry *result = xattr_addto_range(force, setjmp_env,
+							    header, block_end,
+							    first, name_index,
+							    name, value,
+							    value_len);
 
 	if (result == NULL)
 		return -1;
@@ -470,25 +517,34 @@ static int xattr_addto_block(struct ext4_inode *inode, int name_index,
 }
 
 
-static int xattr_add(u32 inode_num, int name_index, const char *name,
-		const void *value, size_t value_len)
+static int xattr_add(struct fs_info *info, struct fs_aux_info *aux_info,
+		     struct sparse_file *ext4_sparse_file, int force,
+		     jmp_buf *setjmp_env, u32 inode_num, int name_index,
+		     const char *name, const void *value, size_t value_len)
 {
 	if (!value)
 		return 0;
 
-	struct ext4_inode *inode = get_inode(inode_num);
+	struct ext4_inode *inode = get_inode(info, aux_info, ext4_sparse_file,
+					     force, setjmp_env, inode_num);
 
 	if (!inode)
 		return -1;
 
-	int result = xattr_addto_inode(inode, name_index, name, value, value_len);
+	int result = xattr_addto_inode(info, force, setjmp_env, inode,
+				       name_index, name, value, value_len);
 	if (result != 0) {
-		result = xattr_addto_block(inode, name_index, name, value, value_len);
+		result = xattr_addto_block(info, aux_info, ext4_sparse_file,
+					   force, setjmp_env, inode, name_index,
+					   name, value, value_len);
 	}
 	return result;
 }
 
-int inode_set_capabilities(u32 inode_num, uint64_t capabilities) {
+int inode_set_capabilities(struct fs_info *info, struct fs_aux_info *aux_info,
+			   struct sparse_file *ext4_sparse_file, int force,
+			   jmp_buf *setjmp_env, u32 inode_num,
+			   uint64_t capabilities) {
 	if (capabilities == 0)
 		return 0;
 
@@ -501,6 +557,7 @@ int inode_set_capabilities(u32 inode_num, uint64_t capabilities) {
 	cap_data.data[1].permitted = (uint32_t) (capabilities >> 32);
 	cap_data.data[1].inheritable = 0;
 
-	return xattr_add(inode_num, EXT4_XATTR_INDEX_SECURITY,
-		XATTR_CAPS_SUFFIX, &cap_data, sizeof(cap_data));
+	return xattr_add(info, aux_info, ext4_sparse_file, force, setjmp_env,
+			 inode_num, EXT4_XATTR_INDEX_SECURITY,
+			 XATTR_CAPS_SUFFIX, &cap_data, sizeof(cap_data));
 }

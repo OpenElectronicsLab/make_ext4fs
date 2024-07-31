@@ -20,11 +20,25 @@
 #include "allocate.h"
 #include "ext4_utils.h"
 
-void inode_allocate_extents(struct ext4_inode *inode, u64 len);
-struct block_allocation* inode_allocate_file_extents(
-	struct ext4_inode *inode, u64 len, const char *filename);
-u8 *inode_allocate_data_extents(struct ext4_inode *inode, u64 len,
-	u64 backing_len);
+void inode_allocate_extents(struct fs_info *info, struct fs_aux_info *aux_info,
+			    struct sparse_file *ext4_sparse_file, int force,
+			    jmp_buf *setjmp_env, struct ext4_inode *inode,
+			    u64 len);
+
+struct block_allocation *inode_allocate_file_extents(struct fs_info *info,
+					struct fs_aux_info *aux_info,
+					struct sparse_file *ext4_sparse_file,
+					int force, jmp_buf *setjmp_env,
+					struct ext4_inode *inode, u64 len,
+					const char *filename);
+
+u8 *inode_allocate_data_extents(struct fs_info *info,
+				struct fs_aux_info *aux_info,
+				struct sparse_file *ext4_sparse_file,
+				int force, jmp_buf *setjmp_env,
+				struct ext4_inode *inode, u64 len,
+				u64 backing_len);
+
 void free_extent_blocks(void);
 
 #endif

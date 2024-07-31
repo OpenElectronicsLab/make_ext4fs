@@ -64,17 +64,17 @@ static int new_inodes_per_group = 0;
 
 static int no_write_fixup_state = 0;
 
-static int compute_new_inum(unsigned int old_inum)
+static int compute_new_inum(struct fs_info *info, unsigned int old_inum)
 {
     unsigned int group, offset;
 
-    group = (old_inum - 1) / info.inodes_per_group;
-    offset = (old_inum -1) % info.inodes_per_group;
+    group = (old_inum - 1) / info->inodes_per_group;
+    offset = (old_inum -1) % info->inodes_per_group;
 
     return (group * new_inodes_per_group) + offset + 1;
 }
 
-static int get_fs_fixup_state(int fd)
+static int get_fs_fixup_state(jmp_buf *setjmp_env, int fd)
 {
     unsigned long long magic;
     int ret, len;
@@ -86,7 +86,7 @@ static int get_fs_fixup_state(int fd)
     lseek(fd, 0, SEEK_SET);
     len = read(fd, &magic, sizeof(magic));
     if (len != sizeof(magic)) {
-        critical_error("cannot read fixup_state\n");
+        critical_error(setjmp_env, "cannot read fixup_state");
     }
 
     switch (magic) {
@@ -105,7 +105,8 @@ static int get_fs_fixup_state(int fd)
     return ret;
 }
 
-static int set_fs_fixup_state(int fd, int state)
+static int set_fs_fixup_state(struct fs_aux_info *aux_info, jmp_buf *setjmp_env,
+			      int fd, int state)
 {
     unsigned long long magic;
     struct ext4_super_block sb;
@@ -135,10 +136,10 @@ static int set_fs_fixup_state(int fd, int state)
     lseek(fd, 0, SEEK_SET);
     len = write(fd, &magic, sizeof(magic));
     if (len != sizeof(magic)) {
-        critical_error("cannot write fixup_state\n");
+        critical_error(setjmp_env, "cannot write fixup_state");
     }
 
-    read_sb(fd, &sb);
+    read_sb(setjmp_env, fd, &sb);
     if (magic) {
         /* If we are in the process of updating the filesystem, make it unmountable */
         sb.s_desc_size |= 1;
@@ -148,56 +149,60 @@ static int set_fs_fixup_state(int fd, int state)
     }
 
     if (!no_write) {
-        write_sb(fd, 1024, &sb);
+        write_sb(setjmp_env, fd, 1024, &sb);
     }
 
     return 0;
 }
 
-static int read_inode(int fd, unsigned int inum, struct ext4_inode *inode)
+static int read_inode(struct fs_info *info, struct fs_aux_info *aux_info,
+		      jmp_buf *setjmp_env, int fd, unsigned int inum,
+		      struct ext4_inode *inode)
 {
     unsigned int bg_num, bg_offset;
     off_t inode_offset;
     int len;
 
-    bg_num = (inum-1) / info.inodes_per_group;
-    bg_offset = (inum-1) % info.inodes_per_group;
+    bg_num = (inum-1) / info->inodes_per_group;
+    bg_offset = (inum-1) % info->inodes_per_group;
 
-    inode_offset = ((unsigned long long)aux_info.bg_desc[bg_num].bg_inode_table * info.block_size) +
-                    (bg_offset * info.inode_size);
+    inode_offset = ((unsigned long long)aux_info->bg_desc[bg_num].bg_inode_table * info->block_size) +
+                    (bg_offset * info->inode_size);
 
     if (lseek(fd, inode_offset, SEEK_SET) < 0) {
-        critical_error_errno("failed to seek to inode %d\n", inum);
+        critical_error_errno(setjmp_env, "failed to seek to inode %d", inum);
     }
 
     len=read(fd, inode, sizeof(*inode));
     if (len != sizeof(*inode)) {
-        critical_error_errno("failed to read inode %d\n", inum);
+        critical_error_errno(setjmp_env, "failed to read inode %d", inum);
     }
 
     return 0;
 }
 
-static int read_block(int fd, unsigned long long block_num, void *block)
+static int read_block(struct fs_info *info, jmp_buf *setjmp_env, int fd,
+		      unsigned long long block_num, void *block)
 {
     off_t off;
     unsigned int len;
 
-    off = block_num * info.block_size;
+    off = block_num * info->block_size;
 
     if (lseek(fd, off, SEEK_SET) , 0) {
-        critical_error_errno("failed to seek to block %lld\n", block_num);
+        critical_error_errno(setjmp_env, "failed to seek to block %lld", block_num);
     }
 
-    len=read(fd, block, info.block_size);
-    if (len != info.block_size) {
-        critical_error_errno("failed to read block %lld\n", block_num);
+    len=read(fd, block, info->block_size);
+    if (len != info->block_size) {
+        critical_error_errno(setjmp_env, "failed to read block %lld", block_num);
     }
 
     return 0;
 }
 
-static int write_block(int fd, unsigned long long block_num, void *block)
+static int write_block(struct fs_info *info, jmp_buf *setjmp_env, int fd,
+		       unsigned long long block_num, void *block)
 {
     off_t off;
     unsigned int len;
@@ -206,35 +211,38 @@ static int write_block(int fd, unsigned long long block_num, void *block)
         return 0;
     }
 
-    off = block_num * info.block_size;
+    off = block_num * info->block_size;
 
     if (lseek(fd, off, SEEK_SET) < 0) {
-        critical_error_errno("failed to seek to block %lld\n", block_num);
+        critical_error_errno(setjmp_env, "failed to seek to block %lld", block_num);
     }
 
-    len=write(fd, block, info.block_size);
-    if (len != info.block_size) {
-        critical_error_errno("failed to write block %lld\n", block_num);
+    len=write(fd, block, info->block_size);
+    if (len != info->block_size) {
+        critical_error_errno(setjmp_env, "failed to write block %lld", block_num);
     }
 
     return 0;
 }
 
-static void check_inode_bitmap(int fd, unsigned int bg_num)
+static void check_inode_bitmap(struct fs_info *info,
+			       struct fs_aux_info *aux_info,
+			       jmp_buf *setjmp_env, int fd,
+			       unsigned int bg_num)
 {
     unsigned int inode_bitmap_block_num;
     unsigned char block[MAX_EXT4_BLOCK_SIZE];
     int i, bitmap_updated = 0;
 
-    /* Using the bg_num, aux_info.bg_desc[], info.inodes_per_group and
+    /* Using the bg_num, aux_info->bg_desc[], info->inodes_per_group and
      * new_inodes_per_group, retrieve the inode bitmap, and make sure
      * the bits between the old and new size are clear
      */
-    inode_bitmap_block_num = aux_info.bg_desc[bg_num].bg_inode_bitmap;
+    inode_bitmap_block_num = aux_info->bg_desc[bg_num].bg_inode_bitmap;
 
-    read_block(fd, inode_bitmap_block_num, block);
+    read_block(info, setjmp_env, fd, inode_bitmap_block_num, block);
 
-    for (i = info.inodes_per_group; i < new_inodes_per_group; i++) {
+    for (i = info->inodes_per_group; i < new_inodes_per_group; i++) {
         if (bitmap_get_bit(block, i)) {
             bitmap_clear_bit(block, i);
             bitmap_updated = 1;
@@ -245,14 +253,17 @@ static void check_inode_bitmap(int fd, unsigned int bg_num)
         if (verbose) {
             printf("Warning: updated inode bitmap for block group %d\n", bg_num);
         }
-        write_block(fd, inode_bitmap_block_num, block);
+        write_block(info, setjmp_env, fd, inode_bitmap_block_num, block);
     }
 
     return;
 }
 
 /* Update the superblock and bgdesc of the specified block group */
-static int update_superblocks_and_bg_desc(int fd, int state)
+static int update_superblocks_and_bg_desc(struct fs_info *info,
+					  struct fs_aux_info *aux_info,
+					  jmp_buf *setjmp_env, int fd,
+					  int state)
 {
     off_t ret;
     struct ext4_super_block sb;
@@ -260,10 +271,10 @@ static int update_superblocks_and_bg_desc(int fd, int state)
     unsigned int i;
 
 
-    read_sb(fd, &sb);
+    read_sb(setjmp_env, fd, &sb);
 
     /* Compute how many more inodes are now available */
-    num_block_groups = DIV_ROUND_UP(aux_info.len_blocks, info.blocks_per_group);
+    num_block_groups = DIV_ROUND_UP(aux_info->len_blocks, info->blocks_per_group);
     total_new_inodes = num_block_groups * (new_inodes_per_group - sb.s_inodes_per_group);
 
     if (verbose) {
@@ -273,17 +284,18 @@ static int update_superblocks_and_bg_desc(int fd, int state)
     /* Update the free inodes count in each block group descriptor */
     for (i = 0; i < num_block_groups; i++) {
        if (state == STATE_UPDATING_SB) {
-           aux_info.bg_desc[i].bg_free_inodes_count += (new_inodes_per_group - sb.s_inodes_per_group);
+           aux_info->bg_desc[i].bg_free_inodes_count += (new_inodes_per_group - sb.s_inodes_per_group);
        }
-       check_inode_bitmap(fd, i);
+       check_inode_bitmap(info, aux_info, setjmp_env, fd, i);
     }
 
     /* First some sanity checks */
     if ((sb.s_inodes_count + total_new_inodes) != (new_inodes_per_group * num_block_groups)) {
-        critical_error("Failed sanity check on new inode count\n");
+        critical_error(setjmp_env, "Failed sanity check on new inode count");
     }
-    if (new_inodes_per_group % (info.block_size/info.inode_size)) {
-        critical_error("Failed sanity check on new inode per group alignment\n");
+    if (new_inodes_per_group % (info->block_size/info->inode_size)) {
+        critical_error(setjmp_env,
+			"Failed sanity check on new inode per group alignment");
     }
 
     /* Update the free inodes count in the superblock */
@@ -291,8 +303,8 @@ static int update_superblocks_and_bg_desc(int fd, int state)
     sb.s_free_inodes_count += total_new_inodes;
     sb.s_inodes_per_group = new_inodes_per_group;
 
-    for (i = 0; i < aux_info.groups; i++) {
-        if (ext4_bg_has_super_block(i)) {
+    for (i = 0; i < aux_info->groups; i++) {
+        if (ext4_bg_has_super_block(info, i)) {
             unsigned int sb_offset;
 
             if (i == 0) {
@@ -311,28 +323,32 @@ static int update_superblocks_and_bg_desc(int fd, int state)
             }
 
             if (!no_write) {
-                write_sb(fd,
+                write_sb(setjmp_env, fd,
                          (unsigned long long)i
-                         * info.blocks_per_group * info.block_size
+                         * info->blocks_per_group * info->block_size
                          + sb_offset,
                          &sb);
             }
 
-            ret = lseek(fd, ((unsigned long long)i * info.blocks_per_group * info.block_size) +
-                              (info.block_size * (aux_info.first_data_block + 1)), SEEK_SET);
+            ret = lseek(fd, ((unsigned long long)i * info->blocks_per_group * info->block_size) +
+                              (info->block_size * (aux_info->first_data_block + 1)), SEEK_SET);
             if (ret < 0)
-                critical_error_errno("failed to seek to block group descriptors");
+                critical_error_errno(setjmp_env,
+			"failed to seek to block group descriptors");
 
             if (!no_write) {
-                ret = write(fd, aux_info.bg_desc, info.block_size * aux_info.bg_desc_blocks);
+                ret = write(fd, aux_info->bg_desc,
+			info->block_size * aux_info->bg_desc_blocks);
                 if (ret < 0)
-                    critical_error_errno("failed to write block group descriptors");
-                if (ret != (int)info.block_size * (int)aux_info.bg_desc_blocks)
-                    critical_error("failed to write all of block group descriptors");
+                    critical_error_errno(setjmp_env,
+			"failed to write block group descriptors");
+                if (ret != (int)info->block_size * (int)aux_info->bg_desc_blocks)
+                    critical_error(setjmp_env,
+			"failed to write all of block group descriptors");
             }
         }
         if ((bail_phase == 4) && ((unsigned int)bail_count == i)) {
-            critical_error("bailing at phase 4\n");
+            critical_error(setjmp_env, "bailing at phase 4");
         }
     }
 
@@ -340,14 +356,15 @@ static int update_superblocks_and_bg_desc(int fd, int state)
 }
 
 
-static int get_direct_blocks(struct ext4_inode *inode, unsigned long long *block_list,
-                                                       unsigned int *count)
+static int get_direct_blocks(struct fs_info *info, struct ext4_inode *inode,
+			     unsigned long long *block_list,
+			     unsigned int *count)
 {
     unsigned int i = 0;
     unsigned int ret = 0;
     unsigned int sectors_per_block;
 
-    sectors_per_block = info.block_size / INODE_BLOCK_SIZE;
+    sectors_per_block = info->block_size / INODE_BLOCK_SIZE;
     while ((i < (inode->i_blocks_lo / sectors_per_block)) && (i < EXT4_NDIR_BLOCKS)) {
         block_list[i] = inode->i_block[i];
         i++;
@@ -362,21 +379,25 @@ static int get_direct_blocks(struct ext4_inode *inode, unsigned long long *block
     return ret;
 }
 
-static int get_indirect_blocks(int fd, struct ext4_inode *inode,
-                               unsigned long long *block_list, unsigned int *count)
+static int get_indirect_blocks(struct fs_info *info, jmp_buf *setjmp_env,
+			       int fd, struct ext4_inode *inode,
+			       unsigned long long *block_list,
+			       unsigned int *count)
 {
     unsigned int i;
     unsigned int *indirect_block;
     unsigned int sectors_per_block;
 
-    sectors_per_block = info.block_size / INODE_BLOCK_SIZE;
+    sectors_per_block = info->block_size / INODE_BLOCK_SIZE;
 
-    indirect_block = (unsigned int *)malloc(info.block_size);
+    indirect_block = (unsigned int *)malloc(info->block_size);
     if (indirect_block == 0) {
-        critical_error("failed to allocate memory for indirect_block\n");
+	critical_error(setjmp_env,
+			"failed to allocate memory for indirect_block");
     }
 
-    read_block(fd, inode->i_block[EXT4_NDIR_BLOCKS], indirect_block);
+    read_block(info, setjmp_env, fd, inode->i_block[EXT4_NDIR_BLOCKS],
+	       indirect_block);
 
     for(i = 0; i < (inode->i_blocks_lo / sectors_per_block - EXT4_NDIR_BLOCKS); i++) {
        block_list[EXT4_NDIR_BLOCKS+i] = indirect_block[i];
@@ -389,25 +410,29 @@ static int get_indirect_blocks(int fd, struct ext4_inode *inode,
     return 0;
 }
 
-static int get_block_list_indirect(int fd, struct ext4_inode *inode, unsigned long long *block_list)
+static int get_block_list_indirect(struct fs_info *info, jmp_buf *setjmp_env,
+				   int fd, struct ext4_inode *inode,
+				   unsigned long long *block_list)
 {
     unsigned int count=0;
 
-    if (get_direct_blocks(inode, block_list, &count)) {
-        get_indirect_blocks(fd, inode, block_list, &count);
+    if (get_direct_blocks(info, inode, block_list, &count)) {
+        get_indirect_blocks(info, setjmp_env, fd, inode, block_list, &count);
     }
 
     return count;
 }
 
-static int get_extent_ents(struct ext4_extent_header *ext_hdr, unsigned long long *block_list)
+static int get_extent_ents(jmp_buf *setjmp_env,
+			   struct ext4_extent_header *ext_hdr,
+			   unsigned long long *block_list)
 {
     int i, j;
     struct ext4_extent *extent;
     off_t fs_block_num;
 
     if (ext_hdr->eh_depth != 0) {
-        critical_error("get_extent_ents called with eh_depth != 0\n");
+        critical_error(setjmp_env, "get_extent_ents called with eh_depth != 0");
     }
 
     /* The extent entries immediately follow the header, so add 1 to the pointer
@@ -426,7 +451,9 @@ static int get_extent_ents(struct ext4_extent_header *ext_hdr, unsigned long lon
     return 0;
 }
 
-static int get_extent_idx(int fd, struct ext4_extent_header *ext_hdr, unsigned long long *block_list)
+static int get_extent_idx(struct fs_info *info, jmp_buf *setjmp_env, int fd,
+			  struct ext4_extent_header *ext_hdr,
+			  unsigned long long *block_list)
 {
     int i;
     struct ext4_extent_idx *extent_idx;
@@ -436,7 +463,7 @@ static int get_extent_idx(int fd, struct ext4_extent_header *ext_hdr, unsigned l
 
     /* Sanity check */
     if (ext_hdr->eh_depth == 0) {
-        critical_error("get_extent_idx called with eh_depth == 0\n");
+        critical_error(setjmp_env, "get_extent_idx called with eh_depth == 0");
     }
 
     /* The extent entries immediately follow the header, so add 1 to the pointer
@@ -446,41 +473,53 @@ static int get_extent_idx(int fd, struct ext4_extent_header *ext_hdr, unsigned l
 
     for (i = 0; i < ext_hdr->eh_entries; i++) {
          fs_block_num = ((off_t)extent_idx->ei_leaf_hi << 32) | extent_idx->ei_leaf_lo;
-         read_block(fd, fs_block_num, block);
+         read_block(info, setjmp_env, fd, fs_block_num, block);
          tmp_ext_hdr = (struct ext4_extent_header *)block;
 
          if (tmp_ext_hdr->eh_depth == 0) {
-             get_extent_ents(tmp_ext_hdr, block_list); /* leaf node, fill in block_list */
+			/* leaf node, fill in block_list */
+             get_extent_ents(setjmp_env, tmp_ext_hdr, block_list);
          } else {
-             get_extent_idx(fd, tmp_ext_hdr, block_list); /* recurse down the tree */
+			/* recurse down the tree */
+             get_extent_idx(info, setjmp_env, fd, tmp_ext_hdr, block_list);
          }
     }
 
     return 0;
 }
 
-static int get_block_list_extents(int fd, struct ext4_inode *inode, unsigned long long *block_list)
+static int get_block_list_extents(struct fs_info *info, jmp_buf * setjmp_env,
+				  int fd, struct ext4_inode *inode,
+				  unsigned long long *block_list)
 {
-    struct ext4_extent_header *extent_hdr;
+	struct ext4_extent_header *extent_hdr;
 
-    extent_hdr = (struct ext4_extent_header *)inode->i_block;
+	extent_hdr = (struct ext4_extent_header *)inode->i_block;
 
-    if (extent_hdr->eh_magic != EXT4_EXT_MAGIC) {
-        critical_error("extent header has unexpected magic value 0x%4.4x\n",
-                       extent_hdr->eh_magic);
-    }
+	if (extent_hdr->eh_magic != EXT4_EXT_MAGIC) {
+		critical_error(setjmp_env,
+			       "extent header"
+			       " has unexpected magic value 0x%4.4x",
+			       extent_hdr->eh_magic);
+	}
 
-    if (extent_hdr->eh_depth == 0) {
-         get_extent_ents((struct ext4_extent_header *)inode->i_block, block_list);
-         return 0;
-    }
+	if (extent_hdr->eh_depth == 0) {
+		get_extent_ents(setjmp_env,
+				(struct ext4_extent_header *)inode->i_block,
+				block_list);
+		return 0;
+	}
 
-    get_extent_idx(fd, (struct ext4_extent_header *)inode->i_block, block_list);
+	get_extent_idx(info, setjmp_env, fd,
+		       (struct ext4_extent_header *)inode->i_block,
+		       block_list);
 
-    return 0;
+	return 0;
 }
 
-static int is_entry_dir(int fd, struct ext4_dir_entry_2 *dirp, int pass)
+static int is_entry_dir(struct fs_info *info, struct fs_aux_info *aux_info,
+			jmp_buf *setjmp_env, int fd,
+			struct ext4_dir_entry_2 *dirp, int pass)
 {
     struct ext4_inode inode;
     int ret = 0;
@@ -498,7 +537,8 @@ static int is_entry_dir(int fd, struct ext4_dir_entry_2 *dirp, int pass)
         if ((pass == UPDATE_INODE_NUMS) && !(dirp->inode & 0x80000000)) {
             ret = 0;
         } else {
-            read_inode(fd, (dirp->inode & 0x7fffffff), &inode);
+            read_inode(info, aux_info, setjmp_env, fd,
+			(dirp->inode & 0x7fffffff), &inode);
             if (S_ISDIR(inode.i_mode)) {
                 ret = 1;
             }
@@ -508,7 +548,9 @@ static int is_entry_dir(int fd, struct ext4_dir_entry_2 *dirp, int pass)
     return ret;
 }
 
-static int recurse_dir(int fd, struct ext4_inode *inode, char *dirbuf, int dirsize, int mode)
+static int recurse_dir(struct fs_info *info, struct fs_aux_info *aux_info,
+		       jmp_buf *setjmp_env, int fd, struct ext4_inode *inode,
+		       char *dirbuf, int dirsize, int mode)
 {
     unsigned long long *block_list;
     unsigned int num_blocks;
@@ -525,23 +567,26 @@ static int recurse_dir(int fd, struct ext4_inode *inode, char *dirbuf, int dirsi
         case UPDATE_INODE_NUMS:
             break;
         default:
-            critical_error("recurse_dir() called witn unknown mode!\n");
+            critical_error(setjmp_env,
+			"recurse_dir() called witn unknown mode!");
     }
 
-    if (dirsize % info.block_size) {
-        critical_error("dirsize %d not a multiple of block_size %d.  This is unexpected!\n",
-                dirsize, info.block_size);
+    if (dirsize % info->block_size) {
+        critical_error(setjmp_env,
+				"dirsize %d not a multiple of block_size %d."
+				"  This is unexpected!",
+                dirsize, info->block_size);
     }
 
-    num_blocks = dirsize / info.block_size;
+    num_blocks = dirsize / info->block_size;
 
     block_list = malloc((num_blocks + 1) * sizeof(*block_list));
     if (block_list == 0) {
-        critical_error("failed to allocate memory for block_list\n");
+        critical_error(setjmp_env, "failed to allocate memory for block_list");
     }
 
     if (inode->i_flags & EXT4_EXTENTS_FL) {
-        get_block_list_extents(fd, inode, block_list);
+        get_block_list_extents(info, setjmp_env, fd, inode, block_list);
     } else {
         /* A directory that requires doubly or triply indirect blocks in huge indeed,
          * and will almost certainly not exist, especially since make_ext4fs only creates
@@ -552,15 +597,16 @@ static int recurse_dir(int fd, struct ext4_inode *inode, char *dirbuf, int dirsi
          * filename length of 20 (which I think is generous) thats 20 + 8 bytes overhead
          * per entry, or 151,552 entries in the directory!
          */
-        if (num_blocks > (info.block_size / 4 + EXT4_NDIR_BLOCKS)) {
-            critical_error("Non-extent based directory is too big!\n");
+        if (num_blocks > (info->block_size / 4 + EXT4_NDIR_BLOCKS)) {
+            critical_error(setjmp_env, "Non-extent based directory is too big!");
         }
-        get_block_list_indirect(fd, inode, block_list);
+        get_block_list_indirect(info, setjmp_env, fd, inode, block_list);
     }
 
     /* Read in all the blocks for this directory */
     for (i = 0; i < num_blocks; i++) {
-        read_block(fd, block_list[i], dirbuf + (i * info.block_size));
+        read_block(info, setjmp_env, fd, block_list[i],
+			dirbuf + (i * info->block_size));
     }
 
     dirp = (struct ext4_dir_entry_2 *)dirbuf;
@@ -598,15 +644,17 @@ static int recurse_dir(int fd, struct ext4_inode *inode, char *dirbuf, int dirsi
          * flag, but the lost+found directory has the type set to Unknown, which
          * seems to imply I need to read the inode and get it.
          */
-        is_dir = is_entry_dir(fd, dirp, mode);
+        is_dir = is_entry_dir(info, aux_info, setjmp_env, fd, dirp, mode);
         if ( is_dir && (strcmp(name, ".") && strcmp(name, "..")) &&
             ((mode == SANITY_CHECK_PASS) || (mode == MARK_INODE_NUMS) ||
               ((mode == UPDATE_INODE_NUMS) && (dirp->inode & 0x80000000))) ) {
             /* A directory!  Recurse! */
-            read_inode(fd, dirp->inode & 0x7fffffff, &tmp_inode);
+            read_inode(info, aux_info, setjmp_env, fd,
+				dirp->inode & 0x7fffffff, &tmp_inode);
 
             if (!S_ISDIR(tmp_inode.i_mode)) {
-                critical_error("inode %d for name %s does not point to a directory\n",
+                critical_error(setjmp_env,
+			"inode %d for name %s does not point to a directory",
                         dirp->inode & 0x7fffffff, name);
             }
             if (verbose) {
@@ -621,10 +669,12 @@ static int recurse_dir(int fd, struct ext4_inode *inode, char *dirbuf, int dirsi
 
             tmp_dirbuf = malloc(tmp_dirsize);
             if (tmp_dirbuf == 0) {
-                critical_error("failed to allocate memory for tmp_dirbuf\n");
+                critical_error(setjmp_env,
+			"failed to allocate memory for tmp_dirbuf");
             }
 
-            recurse_dir(fd, &tmp_inode, tmp_dirbuf, tmp_dirsize, mode);
+            recurse_dir(info, aux_info, setjmp_env, fd, &tmp_inode, tmp_dirbuf,
+			tmp_dirsize, mode);
 
             free(tmp_dirbuf);
         }
@@ -642,12 +692,12 @@ static int recurse_dir(int fd, struct ext4_inode *inode, char *dirbuf, int dirsi
             dirp->inode |= 0x80000000;
         } else if (mode == UPDATE_INODE_NUMS) {
             if (dirp->inode & 0x80000000) {
-                dirp->inode = compute_new_inum(dirp->inode & 0x7fffffff);
+                dirp->inode = compute_new_inum(info, dirp->inode & 0x7fffffff);
             }
         }
 
         if ((bail_phase == mode) && (bail_loc == 1) && (bail_count == count)) {
-            critical_error("Bailing at phase %d, loc 1 and count %d\n", mode, count);
+            critical_error(setjmp_env, "Bailing at phase %d, loc 1 and count %d", mode, count);
         }
 
         /* Point dirp at the next entry */
@@ -657,9 +707,11 @@ static int recurse_dir(int fd, struct ext4_inode *inode, char *dirbuf, int dirsi
 
     /* Write out all the blocks for this directory */
     for (i = 0; i < num_blocks; i++) {
-        write_block(fd, block_list[i], dirbuf + (i * info.block_size));
+        write_block(info, setjmp_env, fd, block_list[i],
+			dirbuf + (i * info->block_size));
         if ((bail_phase == mode) && (bail_loc == 2) && (bail_count <= count)) {
-            critical_error("Bailing at phase %d, loc 2 and count %d\n", mode, count);
+            critical_error(setjmp_env, "Bailing at phase %d, loc 2 and count %d",
+				mode, count);
         }
     }
 
@@ -668,20 +720,23 @@ static int recurse_dir(int fd, struct ext4_inode *inode, char *dirbuf, int dirsi
     return 0;
 }
 
-int ext4fixup(char *fsdev)
+int ext4fixup(struct fs_info *info, struct fs_aux_info *aux_info, int force,
+	      jmp_buf *setjmp_env, char *fsdev)
 {
-    return ext4fixup_internal(fsdev, 0, 0, 0, 0, 0);
+	return ext4fixup_internal(info, aux_info, force, setjmp_env, fsdev,
+				  0, 0, 0, 0, 0);
 }
 
-int ext4fixup_internal(char *fsdev, int v_flag, int n_flag,
-                       int stop_phase, int stop_loc, int stop_count)
+int ext4fixup_internal(struct fs_info *info, struct fs_aux_info *aux_info,
+		       int force, jmp_buf *setjmp_env, char *fsdev, int v_flag,
+		       int n_flag, int stop_phase, int stop_loc, int stop_count)
 {
     int fd;
     struct ext4_inode root_inode;
     unsigned int dirsize;
     char *dirbuf;
 
-    if (setjmp(setjmp_env))
+    if (setjmp(*setjmp_env))
         return EXIT_FAILURE; /* Handle a call to longjmp() */
 
     verbose = v_flag;
@@ -694,12 +749,12 @@ int ext4fixup_internal(char *fsdev, int v_flag, int n_flag,
     fd = open(fsdev, O_RDWR);
 
     if (fd < 0)
-        critical_error_errno("failed to open filesystem image");
+        critical_error_errno(setjmp_env, "failed to open filesystem image");
 
-    read_ext(fd, verbose);
+    read_ext(info, aux_info, force, setjmp_env, fd, verbose);
 
-    if (info.feat_incompat & EXT4_FEATURE_INCOMPAT_RECOVER) {
-        critical_error("Filesystem needs recovery first, mount and unmount to do that\n");
+    if (info->feat_incompat & EXT4_FEATURE_INCOMPAT_RECOVER) {
+        critical_error(setjmp_env, "Filesystem needs recovery first, mount and unmount to do that");
     }
 
     /* Clear the low bit which is set while this tool is in progress.
@@ -708,17 +763,17 @@ int ext4fixup_internal(char *fsdev, int v_flag, int n_flag,
      * it is being fixed up.  Also allow 0, which means the old ext2
      * size is in use.
      */
-    if (((aux_info.sb->s_desc_size & ~1) != sizeof(struct ext2_group_desc)) &&
-        ((aux_info.sb->s_desc_size & ~1) != 0))
-        critical_error("error: bg_desc_size != sizeof(struct ext2_group_desc)\n");
+    if (((aux_info->sb->s_desc_size & ~1) != sizeof(struct ext2_group_desc)) &&
+        ((aux_info->sb->s_desc_size & ~1) != 0))
+        critical_error(setjmp_env, "error: bg_desc_size != sizeof(struct ext2_group_desc)");
 
-    if ((info.feat_incompat & EXT4_FEATURE_INCOMPAT_FILETYPE) == 0) {
-        critical_error("Expected filesystem to have filetype flag set\n");
+    if ((info->feat_incompat & EXT4_FEATURE_INCOMPAT_FILETYPE) == 0) {
+        critical_error(setjmp_env, "Expected filesystem to have filetype flag set");
     }
 
 #if 0 // If we have to fix the directory rec_len issue, we can't use this check
     /* Check to see if the inodes/group is copacetic */
-    if (info.inodes_per_blockgroup % (info.block_size/info.inode_size) == 0) {
+    if (info->inodes_per_blockgroup % (info->block_size/info->inode_size) == 0) {
              /* This filesystem has either already been updated, or was
               * made correctly.
               */
@@ -730,12 +785,12 @@ int ext4fixup_internal(char *fsdev, int v_flag, int n_flag,
 #endif
 
     /* Compute what the new value of inodes_per_blockgroup will be when we're done */
-    new_inodes_per_group=EXT4_ALIGN(info.inodes_per_group,(info.block_size/info.inode_size));
+    new_inodes_per_group=EXT4_ALIGN(info->inodes_per_group,(info->block_size/info->inode_size));
 
-    read_inode(fd, EXT4_ROOT_INO, &root_inode);
+    read_inode(info, aux_info, setjmp_env, fd, EXT4_ROOT_INO, &root_inode);
 
     if (!S_ISDIR(root_inode.i_mode)) {
-        critical_error("root inode %d does not point to a directory\n", EXT4_ROOT_INO);
+        critical_error(setjmp_env, "root inode %d does not point to a directory", EXT4_ROOT_INO);
     }
     if (verbose) {
         printf("inode %d %s use extents\n", EXT4_ROOT_INO,
@@ -749,7 +804,7 @@ int ext4fixup_internal(char *fsdev, int v_flag, int n_flag,
 
     dirbuf = malloc(dirsize);
     if (dirbuf == 0) {
-        critical_error("failed to allocate memory for dirbuf\n");
+        critical_error(setjmp_env, "failed to allocate memory for dirbuf");
     }
 
     /* Perform a sanity check pass first, try to catch any errors that will occur
@@ -762,37 +817,42 @@ int ext4fixup_internal(char *fsdev, int v_flag, int n_flag,
      * check if state is unset because it assumes inodes are to be computed using the
      * old inodes/group, but some inode numbers may be updated to the new number.
      */
-    if (get_fs_fixup_state(fd) == STATE_UNSET) {
+    if (get_fs_fixup_state(setjmp_env, fd) == STATE_UNSET) {
         verbose = 0;
         no_write = 1;
-        recurse_dir(fd, &root_inode, dirbuf, dirsize, SANITY_CHECK_PASS);
-        update_superblocks_and_bg_desc(fd, STATE_UNSET);
+        recurse_dir(info, aux_info, setjmp_env, fd, &root_inode, dirbuf,
+			dirsize, SANITY_CHECK_PASS);
+        update_superblocks_and_bg_desc(info, aux_info, setjmp_env, fd,
+			STATE_UNSET);
         verbose = v_flag;
         no_write = n_flag;
 
-        set_fs_fixup_state(fd, STATE_MARKING_INUMS);
+        set_fs_fixup_state(aux_info, setjmp_env, fd, STATE_MARKING_INUMS);
     }
 
-    if (get_fs_fixup_state(fd) == STATE_MARKING_INUMS) {
+    if (get_fs_fixup_state(setjmp_env, fd) == STATE_MARKING_INUMS) {
         count = 0; /* Reset debugging counter */
-        if (!recurse_dir(fd, &root_inode, dirbuf, dirsize, MARK_INODE_NUMS)) {
-            set_fs_fixup_state(fd, STATE_UPDATING_INUMS);
+        if (!recurse_dir(info, aux_info, setjmp_env, fd, &root_inode, dirbuf,
+			dirsize, MARK_INODE_NUMS)) {
+            set_fs_fixup_state(aux_info, setjmp_env, fd, STATE_UPDATING_INUMS);
         }
     }
 
-    if (get_fs_fixup_state(fd) == STATE_UPDATING_INUMS) {
+    if (get_fs_fixup_state(setjmp_env, fd) == STATE_UPDATING_INUMS) {
         count = 0; /* Reset debugging counter */
-        if (!recurse_dir(fd, &root_inode, dirbuf, dirsize, UPDATE_INODE_NUMS)) {
-            set_fs_fixup_state(fd, STATE_UPDATING_SB);
+        if (!recurse_dir(info, aux_info, setjmp_env, fd, &root_inode, dirbuf,
+			dirsize, UPDATE_INODE_NUMS)) {
+            set_fs_fixup_state(aux_info, setjmp_env, fd, STATE_UPDATING_SB);
         }
     }
 
-    if (get_fs_fixup_state(fd) == STATE_UPDATING_SB) {
+    if (get_fs_fixup_state(setjmp_env, fd) == STATE_UPDATING_SB) {
         /* set the new inodes/blockgroup number,
          * and sets the state back to 0.
          */
-        if (!update_superblocks_and_bg_desc(fd, STATE_UPDATING_SB)) {
-            set_fs_fixup_state(fd, STATE_UNSET);
+        if (!update_superblocks_and_bg_desc(info, aux_info, setjmp_env, fd,
+			STATE_UPDATING_SB)) {
+            set_fs_fixup_state(aux_info, setjmp_env, fd, STATE_UNSET);
         }
     }
 

@@ -37,28 +37,40 @@ struct block_allocation {
 	struct block_allocation* next;
 };
 
+struct sparse_file;
 
-void block_allocator_init(void);
-void block_allocator_free(void);
-u32 allocate_block(void);
-struct block_allocation *allocate_blocks(u32 len);
+void block_allocator_init(struct fs_info *info, struct fs_aux_info *aux_info,
+			  struct sparse_file *ext4_sparse_file, int force,
+			  jmp_buf *setjmp_env);
+void block_allocator_free(struct fs_aux_info *aux_info);
+u32 allocate_block(struct fs_aux_info *aux_info, int force,
+		   jmp_buf *setjmp_env);
+struct block_allocation *allocate_blocks(struct fs_aux_info *aux_info,
+					 int force, jmp_buf *setjmp_env,
+					 u32 len);
 int block_allocation_num_regions(struct block_allocation *alloc);
 int block_allocation_len(struct block_allocation *alloc);
-struct ext4_inode *get_inode(u32 inode);
-struct ext4_xattr_header *get_xattr_block_for_inode(struct ext4_inode *inode);
-void reduce_allocation(struct block_allocation *alloc, u32 len);
+struct ext4_inode *get_inode(struct fs_info *info, struct fs_aux_info *aux_info,
+			     struct sparse_file *ext4_sparse_file, int force,
+			     jmp_buf *setjmp_env, u32 inode);
+struct ext4_xattr_header *get_xattr_block_for_inode(struct fs_info *info,
+						struct fs_aux_info *aux_info,
+						struct sparse_file *ext4_sparse_file,
+						int force, jmp_buf *setjmp_env,
+						struct ext4_inode *inode);
+void reduce_allocation(struct fs_aux_info *aux_info, struct block_allocation *alloc, u32 len);
 u32 get_block(struct block_allocation *alloc, u32 block);
 u32 get_oob_block(struct block_allocation *alloc, u32 block);
 void get_next_region(struct block_allocation *alloc);
 void get_region(struct block_allocation *alloc, u32 *block, u32 *len);
-u32 get_free_blocks(u32 bg);
-u32 get_free_inodes(u32 bg);
-u32 reserve_inodes(int bg, u32 inodes);
-void add_directory(u32 inode);
-u16 get_directories(int bg);
-u16 get_bg_flags(int bg);
+u32 get_free_blocks(struct fs_aux_info *aux_info, u32 bg);
+u32 get_free_inodes(struct fs_aux_info *aux_info, u32 bg);
+u32 reserve_inodes(struct fs_aux_info *aux_info, int bg, u32 inodes);
+void add_directory(struct fs_info *info, struct fs_aux_info *aux_info, u32 inode);
+u16 get_directories(struct fs_aux_info *aux_info, int bg);
+u16 get_bg_flags(struct fs_aux_info *aux_info, int bg);
 void init_unused_inode_tables(void);
-u32 allocate_inode(void);
+u32 allocate_inode(struct fs_info *info, struct fs_aux_info *aux_info);
 void free_alloc(struct block_allocation *alloc);
 int reserve_oob_blocks(struct block_allocation *alloc, int blocks);
 int advance_blocks(struct block_allocation *alloc, int blocks);
@@ -68,7 +80,9 @@ void rewind_alloc(struct block_allocation *alloc);
 void append_region(struct block_allocation *alloc,
 	u32 block, u32 len, int bg);
 struct block_allocation *create_allocation(void);
-int append_oob_allocation(struct block_allocation *alloc, u32 len);
+int append_oob_allocation(struct fs_aux_info *aux_info, int force,
+			  jmp_buf *setjmp_env, struct block_allocation *alloc,
+			  u32 len);
 void print_blocks(FILE* f, struct block_allocation *alloc);
 
 #endif

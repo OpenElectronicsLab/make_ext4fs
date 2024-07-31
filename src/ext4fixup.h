@@ -14,7 +14,10 @@
  * limitations under the License.
  */
 
-int ext4fixup(char *fsdev);
-int ext4fixup_internal(char *fsdev, int v_flag, int n_flag,
-                       int stop_phase, int stop_loc, int stop_count);
+int ext4fixup(struct fs_info *info, struct fs_aux_info *aux_info, int force,
+	      jmp_buf *setjmp_env, char *fsdev);
 
+int ext4fixup_internal(struct fs_info *info, struct fs_aux_info *aux_info,
+		       int force, jmp_buf *setjmp_env, char *fsdev, int v_flag,
+		       int n_flag, int stop_phase, int stop_loc,
+		       int stop_count);

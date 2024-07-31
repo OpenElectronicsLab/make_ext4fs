@@ -58,32 +58,47 @@ int main(int argc, char **argv)
 	int verbose = 0;
 	time_t fixed_time = -1;
 	FILE* block_list_file = NULL;
+	int uuid_user_specified = 0;
+	int force = 0;
+	jmp_buf my_setjmp_env;
+	jmp_buf *setjmp_env = &my_setjmp_env;
+	struct fs_info my_info;
+	struct fs_info *info = &my_info;
+	struct fs_aux_info my_aux_info;
+	struct fs_aux_info *aux_info = &my_aux_info;
+	struct sparse_file my_sparse_file;
+	struct sparse_file *ext4_sparse_file = &my_sparse_file;
+
+	memset(setjmp_env, 0x00, sizeof(jmp_buf));
+	memset(info, 0x00, sizeof(struct fs_info));
+	memset(aux_info, 0x00, sizeof(struct fs_aux_info));
+	memset(ext4_sparse_file, 0x00, sizeof(struct sparse_file));
 
 	while ((opt = getopt(argc, argv, "l:j:b:g:i:I:L:u:T:C:B:m:fwzJsctv")) != -1) {
 		switch (opt) {
 		case 'l':
-			info.len = parse_num(optarg);
+			info->len = parse_num(optarg);
 			break;
 		case 'j':
-			info.journal_blocks = parse_num(optarg);
+			info->journal_blocks = parse_num(optarg);
 			break;
 		case 'b':
-			info.block_size = parse_num(optarg);
+			info->block_size = parse_num(optarg);
 			break;
 		case 'g':
-			info.blocks_per_group = parse_num(optarg);
+			info->blocks_per_group = parse_num(optarg);
 			break;
 		case 'i':
-			info.inodes = parse_num(optarg);
+			info->inodes = parse_num(optarg);
 			break;
 		case 'I':
-			info.inode_size = parse_num(optarg);
+			info->inode_size = parse_num(optarg);
 			break;
 		case 'L':
-			info.label = optarg;
+			info->label = optarg;
 			break;
 		case 'u':
-			if (!parse_uuid(info.uuid, optarg, strlen(optarg))) {
+			if (!parse_uuid(info->uuid, optarg, strlen(optarg))) {
 				fprintf(stderr, "failed to parse UUID: '%s'\n",
 					optarg);
 				exit(EXIT_FAILURE);
@@ -100,7 +115,7 @@ int main(int argc, char **argv)
 			gzip = 1;
 			break;
 		case 'J':
-			info.no_journal = 1;
+			info->no_journal = 1;
 			break;
 		case 'c':
 			crc = 1;
@@ -128,7 +143,7 @@ int main(int argc, char **argv)
 			}
 			break;
 		case 'm':
-			info.reserve_pcnt = strtoul(optarg, NULL, 0);
+			info->reserve_pcnt = strtoul(optarg, NULL, 0);
 			break;
 		default: /* '?' */
 			usage(argv[0]);
@@ -183,8 +198,11 @@ int main(int argc, char **argv)
 		fd = STDOUT_FILENO;
 	}
 
-	exitcode = make_ext4fs_internal(fd, directory, fs_config_func, gzip,
-		sparse, crc, wipe, verbose, fixed_time, block_list_file);
+	exitcode = make_ext4fs_internal(info, aux_info, ext4_sparse_file, force,
+					setjmp_env, uuid_user_specified, fd,
+					directory, fs_config_func, gzip,
+					sparse, crc, wipe, verbose, fixed_time,
+					block_list_file);
 	close(fd);
 	if (block_list_file)
 		fclose(block_list_file);

@@ -32,13 +32,27 @@ struct dentry {
 	uint64_t capabilities;
 };
 
-u32 make_directory(u32 dir_inode_num, u32 entries, struct dentry *dentries,
-	u32 dirs);
-u32 make_file(const char *filename, u64 len);
-u32 make_link(const char *link);
-u32 make_special(const char *path);
-int inode_set_permissions(u32 inode_num, u16 mode, u16 uid, u16 gid, u32 mtime);
-int inode_set_capabilities(u32 inode_num, uint64_t capabilities);
+u32 make_directory(struct fs_info *info, struct fs_aux_info *aux_info,
+		   struct sparse_file *ext4_sparse_file, int force,
+		   jmp_buf *setjmp_env, u32 dir_inode_num, u32 entries,
+		   struct dentry *dentries, u32 dirs);
+u32 make_file(struct fs_info *info, struct fs_aux_info *aux_info,
+	      struct sparse_file *ext4_sparse_file, int force,
+	      jmp_buf *setjmp_env, const char *filename, u64 len);
+u32 make_link(struct fs_info *info, struct fs_aux_info *aux_info,
+	      struct sparse_file *ext4_sparse_file, int force,
+	      jmp_buf *setjmp_env, const char *link);
+u32 make_special(struct fs_info *info, struct fs_aux_info *aux_info,
+		 struct sparse_file *ext4_sparse_file, int force,
+		 jmp_buf *setjmp_env, const char *path);
+int inode_set_permissions(struct fs_info *info, struct fs_aux_info *aux_info,
+			  struct sparse_file *ext4_sparse_file, int force,
+			  jmp_buf *setjmp_env, u32 inode_num, u16 mode, u16 uid,
+			  u16 gid, u32 mtime);
+int inode_set_capabilities(struct fs_info *info, struct fs_aux_info *aux_info,
+			   struct sparse_file *ext4_sparse_file, int force,
+			   jmp_buf *setjmp_env, u32 inode_num,
+			   uint64_t capabilities);
 struct block_allocation* get_saved_allocation_chain(void);
 
 #endif
