@@ -27,10 +27,10 @@
 
 #include "ext4_utils.h"
 #include "canned_fs_config.h"
+#include "sparse_file.h"
 
 extern struct fs_info info;
 extern int uuid_user_specified;
-
 
 static void usage(char *path)
 {

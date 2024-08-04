@@ -1,3 +1,13 @@
+2024-08-04  Eric Herman  <eric@freesa.org>
+
+	make sparse includes quotes (not brackets)
+
+	* Makefile: includes
+	* src/allocate.c: includes
+	* src/ext4fixup.c: includes
+	* src/ext4_utils.c: includes
+	* src/make_ext4fs_main.c: includes
+
 2024-07-25  Eric Herman  <eric@freesa.org>
 
 	added licenses to makefiles
