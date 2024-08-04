@@ -5,7 +5,7 @@
 # Copyright (C) 2024 Eric Herman <eric@freesa.org>
 
 CC ?= gcc
-CFLAGS += -Iinclude -Ilibsparse/include
+CFLAGS += -Iinclude -Ilibsparse -Ilibsparse/include
 
 BUILD_DIR ?= ./build
 

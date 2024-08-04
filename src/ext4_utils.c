@@ -19,7 +19,7 @@
 #include "indirect.h"
 #include "extent.h"
 
-#include <sparse/sparse.h>
+#include "sparse/sparse.h"
 
 #include <assert.h>
 #include <ctype.h>
