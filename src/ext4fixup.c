@@ -18,7 +18,7 @@
 #include "allocate.h"
 #include "ext4fixup.h"
 
-#include <sparse/sparse.h>
+#include "sparse/sparse.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
