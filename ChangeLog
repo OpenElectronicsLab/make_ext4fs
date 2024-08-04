@@ -1,12 +1,28 @@
 2024-08-04  Eric Herman  <eric@freesa.org>
 
+	move libsparse into src/
 	make sparse includes quotes (not brackets)
 
-	* Makefile: includes
+	* Makefile: includes, file moves
 	* src/allocate.c: includes
 	* src/ext4fixup.c: includes
 	* src/ext4_utils.c: includes
 	* src/make_ext4fs_main.c: includes
+	* src/libsparse/backed_block.c: moved
+	* src/libsparse/backed_block.h: moved
+	* src/libsparse/defs.h: moved
+	* src/libsparse/include/sparse/sparse.h: moved
+	* src/libsparse/output_file.c: moved
+	* src/libsparse/output_file.h: moved
+	* src/libsparse/sparse.c: moved
+	* src/libsparse/sparse_crc32.c: moved
+	* src/libsparse/sparse_crc32.h: moved
+	* src/libsparse/sparse_defs.h: moved
+	* src/libsparse/sparse_err.c: moved
+	* src/libsparse/sparse_file.h: moved
+	* src/libsparse/sparse_format.h: moved
+	* src/libsparse/sparse_read.c:moved
+	* libsparse/Makefile: deleted
 
 2024-07-25  Eric Herman  <eric@freesa.org>
 
