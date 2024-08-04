@@ -1,6 +1,6 @@
 2024-08-04  Eric Herman  <eric@freesa.org>
 
-	move libsparse into src/
+	move libsparse and android_filesystem_capability.h into src/
 	make sparse includes quotes (not brackets)
 
 	* Makefile: includes, file moves
@@ -8,6 +8,7 @@
 	* src/ext4fixup.c: includes
 	* src/ext4_utils.c: includes
 	* src/make_ext4fs_main.c: includes
+	* src/include/private/android_filesystem_capability.h: moved
 	* src/libsparse/backed_block.c: moved
 	* src/libsparse/backed_block.h: moved
 	* src/libsparse/defs.h: moved
