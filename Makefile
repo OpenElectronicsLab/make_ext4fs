@@ -5,7 +5,7 @@
 # Copyright (C) 2024 Eric Herman <eric@freesa.org>
 
 CC ?= gcc
-CFLAGS += -Iinclude -Isrc/libsparse -Isrc/libsparse/include
+CFLAGS += -Isrc/include -Isrc/libsparse -Isrc/libsparse/include
 
 BUILD_DIR ?= ./build
 
@@ -69,5 +69,5 @@ check: check-device check-blockfile
 
 .PHONY: clean
 clean:
-	rm -rfv $(OBJ) $(BUILD_DIR)/make_ext4fs $(BUILD_DIR)/sparse \
-		$(BUILD_DIR)/test-????
+	rm -rfv $(OBJ) $(BUILD_DIR)/make_ext4fs $(BUILD_DIR)/*.o \
+		$(BUILD_DIR)/sparse $(BUILD_DIR)/test-???? ./build
