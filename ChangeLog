@@ -2,8 +2,13 @@
 
 	Replace globals with stack variables.
 	Add a README.md
+	split NOTICE into NOTICE and LICENSE
+	remove MODULE_LICENSE_APACHE2 (empty marker file from AOSP tooling)
 
 	* README.md: added
+	* NOTICE: split into NOTICE and LICENSE
+	* LICENSE: Just the text of Apache v2.0 (copyright Apache, not the AOSP)
+	* MODULE_LICENSE_APACHE2: deleted
 
 	* src/ext4_utils.c: removed globals: force, info, aux_info,
 				ext4_sparse_file, uuid_user_specified,
