@@ -1,6 +1,9 @@
 2024-08-05  Eric Herman  <eric@freesa.org>
 
 	Replace globals with stack variables.
+	Add a README.md
+
+	* README.md: added
 
 	* src/ext4_utils.c: removed globals: force, info, aux_info,
 				ext4_sparse_file, uuid_user_specified,
