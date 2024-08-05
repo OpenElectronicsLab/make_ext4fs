@@ -19,8 +19,24 @@
 
 #include <inttypes.h>
 
-int load_canned_fs_config(const char* fn);
-int canned_fs_config(const char* path, int dir,
-                     unsigned* uid, unsigned* gid, unsigned* mode, uint64_t* capabilities);
+struct fs_config_path {
+	const char* path;
+	unsigned uid;
+	unsigned gid;
+	unsigned mode;
+	uint64_t capabilities;
+};
+
+struct fs_config_list {
+	struct fs_config_path* canned_data;
+	size_t canned_alloc;
+	size_t canned_used;
+};
+
+int load_canned_fs_config(struct fs_config_list *config_list, const char* fn);
+
+int canned_fs_config(struct fs_config_list *config_list, const char *path,
+		     int dir, unsigned *uid, unsigned *gid, unsigned *mode,
+		     uint64_t *capabilities);
 
 #endif

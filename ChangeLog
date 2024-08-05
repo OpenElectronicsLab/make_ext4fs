@@ -1,3 +1,38 @@
+2024-08-05  Eric Herman  <eric@freesa.org>
+
+	Replace globals with stack variables.
+
+	* src/ext4_utils.c: removed globals: force, info, aux_info,
+				ext4_sparse_file, uuid_user_specified,
+				setjmp_env
+
+	* src/canned_fs_config.c: removed globals: canned_data, canned_alloc,
+					canned_used
+
+	* src/contents.c: removed global: saved_allocation_head
+
+	* src/ext4fixup.c: removed globals: verbose, no_write,
+				no_write_fixup_state, new_inodes_per_group
+
+	* src/libsparse/sparse_read.c: removed global: copybuf,
+					fixed memory leak (free(buf) missing)
+
+	* src/make_ext4fs_main.c: (most) former globals now created here
+
+	* src/allocate.h
+	* src/canned_fs_config.h
+	* src/contents.h
+	* src/ext4fixup.h
+	* src/ext4_utils.h
+	* src/extent.h
+	* src/indirect.h
+	* src/libsparse/include/sparse/sparse.h
+
+	* src/allocate.c
+	* src/extent.c
+	* src/indirect.c
+	* src/make_ext4fs.c
+
 2024-08-04  Eric Herman  <eric@freesa.org>
 
 	move libsparse and android_filesystem_capability.h into src/

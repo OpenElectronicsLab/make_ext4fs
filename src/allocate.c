@@ -69,23 +69,23 @@ struct block_allocation *create_allocation()
 	return alloc;
 }
 
-static struct ext4_xattr_header *xattr_list_find(struct ext4_inode *inode)
+static struct ext4_xattr_header *xattr_list_find(struct fs_aux_info *aux_info, struct ext4_inode *inode)
 {
 	struct xattr_list_element *element;
-	for (element = aux_info.xattrs; element != NULL; element = element->next) {
+	for (element = aux_info->xattrs; element != NULL; element = element->next) {
 		if (element->inode == inode)
 			return element->header;
 	}
 	return NULL;
 }
 
-static void xattr_list_insert(struct ext4_inode *inode, struct ext4_xattr_header *header)
+static void xattr_list_insert(struct fs_aux_info *aux_info, struct ext4_inode *inode, struct ext4_xattr_header *header)
 {
 	struct xattr_list_element *element = malloc(sizeof(struct xattr_list_element));
 	element->inode = inode;
 	element->header = header;
-	element->next = aux_info.xattrs;
-	aux_info.xattrs = element;
+	element->next = aux_info->xattrs;
+	aux_info->xattrs = element;
 }
 
 static void region_list_remove(struct region_list *list, struct region *reg)
@@ -167,22 +167,26 @@ void append_region(struct block_allocation *alloc,
 	region_list_append(&alloc->list, reg);
 }
 
-static void allocate_bg_inode_table(struct block_group_info *bg)
+static void allocate_bg_inode_table(struct fs_info *info,
+				    struct fs_aux_info *aux_info,
+				    struct sparse_file *ext4_sparse_file,
+				    jmp_buf *setjmp_env, int i)
 {
+	struct block_group_info *bg = &aux_info->bgs[i];
 	if (bg->inode_table != NULL)
 		return;
 
 	u32 block = bg->first_block + 2;
 
 	if (bg->has_superblock)
-		block += aux_info.bg_desc_blocks + info.bg_desc_reserve_blocks + 1;
+		block += aux_info->bg_desc_blocks + info->bg_desc_reserve_blocks + 1;
 
-	bg->inode_table = calloc(aux_info.inode_table_blocks, info.block_size);
+	bg->inode_table = calloc(aux_info->inode_table_blocks, info->block_size);
 	if (bg->inode_table == NULL)
-		critical_error_errno("calloc");
+		critical_error_errno(setjmp_env, "calloc");
 
 	sparse_file_add_data(ext4_sparse_file, bg->inode_table,
-			aux_info.inode_table_blocks	* info.block_size, block);
+			aux_info->inode_table_blocks	* info->block_size, block);
 
 	bg->flags &= ~EXT4_BG_INODE_UNINIT;
 }
@@ -205,7 +209,8 @@ static int bitmap_set_8_bits(u8 *bitmap, u32 bit)
 
 /* Marks a the first num_blocks blocks in a block group as used, and accounts
  for them in the block group free block info. */
-static int reserve_blocks(struct block_group_info *bg, u32 start, u32 num)
+static int reserve_blocks(int force, jmp_buf *setjmp_env,
+			  struct block_group_info *bg, u32 start, u32 num)
 {
 	unsigned int i = 0;
 
@@ -215,21 +220,24 @@ static int reserve_blocks(struct block_group_info *bg, u32 start, u32 num)
 
 	for (i = 0; i < num && block % 8 != 0; i++, block++) {
 		if (bitmap_set_bit(bg->block_bitmap, block)) {
-			error("attempted to reserve already reserved block");
+			error(force, setjmp_env,
+			      "attempted to reserve already reserved block");
 			return -1;
 		}
 	}
 
 	for (; i + 8 <= (num & ~7); i += 8, block += 8) {
 		if (bitmap_set_8_bits(bg->block_bitmap, block)) {
-			error("attempted to reserve already reserved block");
+			error(force, setjmp_env,
+			      "attempted to reserve already reserved block");
 			return -1;
 		}
 	}
 
 	for (; i < num; i++, block++) {
 		if (bitmap_set_bit(bg->block_bitmap, block)) {
-			error("attempted to reserve already reserved block");
+			error(force, setjmp_env,
+			      "attempted to reserve already reserved block");
 			return -1;
 		}
 	}
@@ -254,18 +262,18 @@ static void free_blocks(struct block_group_info *bg, u32 num_blocks)
 /* Reduces an existing allocation by len blocks by return the last blocks
    to the free pool in their block group. Assumes that the blocks being
    returned were the last ones allocated out of the block group */
-void reduce_allocation(struct block_allocation *alloc, u32 len)
+void reduce_allocation(struct fs_aux_info *aux_info, struct block_allocation *alloc, u32 len)
 {
 	while (len) {
 		struct region *last_reg = alloc->list.last;
 
 		if (last_reg->len > len) {
-			free_blocks(&aux_info.bgs[last_reg->bg], len);
+			free_blocks(&aux_info->bgs[last_reg->bg], len);
 			last_reg->len -= len;
 			len = 0;
 		} else {
 			struct region *reg = alloc->list.last->prev;
-			free_blocks(&aux_info.bgs[last_reg->bg], last_reg->len);
+			free_blocks(&aux_info->bgs[last_reg->bg], last_reg->len);
 			len -= last_reg->len;
 			if (reg) {
 				reg->next = NULL;
@@ -280,90 +288,106 @@ void reduce_allocation(struct block_allocation *alloc, u32 len)
 	}
 }
 
-static void init_bg(struct block_group_info *bg, unsigned int i)
+static void init_bg(struct fs_info *info, struct fs_aux_info *aux_info,
+		    struct sparse_file *ext4_sparse_file, int force,
+		    jmp_buf *setjmp_env, size_t i)
 {
-	int header_blocks = 2 + aux_info.inode_table_blocks;
+	struct block_group_info *bg = &aux_info->bgs[i];
+	int header_blocks = 2 + aux_info->inode_table_blocks;
 
-	bg->has_superblock = ext4_bg_has_super_block(i);
+	bg->has_superblock = ext4_bg_has_super_block(info, i);
 
 	if (bg->has_superblock)
-		header_blocks += 1 + aux_info.bg_desc_blocks + info.bg_desc_reserve_blocks;
+		header_blocks += 1 + aux_info->bg_desc_blocks + info->bg_desc_reserve_blocks;
 
-	bg->bitmaps = calloc(info.block_size, 2);
+	bg->bitmaps = calloc(info->block_size, 2);
 	bg->block_bitmap = bg->bitmaps;
-	bg->inode_bitmap = bg->bitmaps + info.block_size;
+	bg->inode_bitmap = bg->bitmaps + info->block_size;
 
 	bg->header_blocks = header_blocks;
-	bg->first_block = aux_info.first_data_block + i * info.blocks_per_group;
+	bg->first_block = aux_info->first_data_block + i * info->blocks_per_group;
 
 	u32 block = bg->first_block;
 	if (bg->has_superblock)
-		block += 1 + aux_info.bg_desc_blocks +  info.bg_desc_reserve_blocks;
-	sparse_file_add_data(ext4_sparse_file, bg->bitmaps, 2 * info.block_size,
+		block += 1 + aux_info->bg_desc_blocks +  info->bg_desc_reserve_blocks;
+	sparse_file_add_data(ext4_sparse_file, bg->bitmaps, 2 * info->block_size,
 			block);
 
 	bg->data_blocks_used = 0;
-	bg->free_blocks = info.blocks_per_group;
+	bg->free_blocks = info->blocks_per_group;
 	bg->first_free_block = 0;
-	bg->free_inodes = info.inodes_per_group;
+	bg->free_inodes = info->inodes_per_group;
 	bg->first_free_inode = 1;
 	bg->flags = EXT4_BG_INODE_UNINIT;
 
-	if (reserve_blocks(bg, bg->first_free_block, bg->header_blocks) < 0)
-		error("failed to reserve %u blocks in block group %u\n", bg->header_blocks, i);
+	if (reserve_blocks(force, setjmp_env, bg, bg->first_free_block,
+			   bg->header_blocks) < 0)
+		error(force, setjmp_env,
+		      "failed to reserve %u blocks in block group %zu\n",
+		      bg->header_blocks, i);
 
-	if (bg->first_block + info.blocks_per_group > aux_info.len_blocks) {
-		u32 overrun = bg->first_block + info.blocks_per_group - aux_info.len_blocks;
-		reserve_blocks(bg, info.blocks_per_group - overrun, overrun);
+	if (bg->first_block + info->blocks_per_group > aux_info->len_blocks) {
+		u32 overrun = bg->first_block + info->blocks_per_group - aux_info->len_blocks;
+		reserve_blocks(force, setjmp_env, bg,
+			       info->blocks_per_group - overrun, overrun);
 	}
 }
 
-void block_allocator_init()
+void block_allocator_init(struct fs_info *info, struct fs_aux_info *aux_info,
+			  struct sparse_file *ext4_sparse_file, int force,
+			  jmp_buf *setjmp_env)
+{
+	size_t i;
+
+	aux_info->bgs = calloc(sizeof(struct block_group_info), aux_info->groups);
+	if (aux_info->bgs == NULL)
+		critical_error_errno(setjmp_env, "calloc");
+
+	for (i = 0; i < aux_info->groups; i++)
+		init_bg(info, aux_info, ext4_sparse_file, force, setjmp_env, i);
+}
+
+void block_allocator_free(struct fs_aux_info *aux_info)
 {
 	unsigned int i;
 
-	aux_info.bgs = calloc(sizeof(struct block_group_info), aux_info.groups);
-	if (aux_info.bgs == NULL)
-		critical_error_errno("calloc");
-
-	for (i = 0; i < aux_info.groups; i++)
-		init_bg(&aux_info.bgs[i], i);
-}
-
-void block_allocator_free()
-{
-	unsigned int i;
-
-	for (i = 0; i < aux_info.groups; i++) {
-		free(aux_info.bgs[i].bitmaps);
-		free(aux_info.bgs[i].inode_table);
+	for (i = 0; i < aux_info->groups; i++) {
+		free(aux_info->bgs[i].bitmaps);
+		free(aux_info->bgs[i].inode_table);
 	}
-	free(aux_info.bgs);
+	free(aux_info->bgs);
 }
 
-static u32 ext4_allocate_blocks_from_block_group(u32 len, int bg_num)
+static u32 ext4_allocate_blocks_from_block_group(struct fs_aux_info *aux_info,
+						 int force, jmp_buf *setjmp_env,
+						 u32 len, int bg_num)
 {
-	if (get_free_blocks(bg_num) < len)
+	if (get_free_blocks(aux_info, bg_num) < len)
 		return EXT4_ALLOCATE_FAILED;
 
-	u32 block = aux_info.bgs[bg_num].first_free_block;
-	struct block_group_info *bg = &aux_info.bgs[bg_num];
-	if (reserve_blocks(bg, bg->first_free_block, len) < 0) {
-		error("failed to reserve %u blocks in block group %u\n", len, bg_num);
+	u32 block = aux_info->bgs[bg_num].first_free_block;
+	struct block_group_info *bg = &aux_info->bgs[bg_num];
+	if (reserve_blocks(force, setjmp_env, bg, bg->first_free_block, len)
+			< 0) {
+		error(force, setjmp_env,
+		      "failed to reserve %u blocks in block group %u\n", len,
+		      bg_num);
 		return EXT4_ALLOCATE_FAILED;
 	}
 
-	aux_info.bgs[bg_num].data_blocks_used += len;
+	aux_info->bgs[bg_num].data_blocks_used += len;
 
 	return bg->first_block + block;
 }
 
 /* Allocate a single block and return its block number */
-u32 allocate_block()
+u32 allocate_block(struct fs_aux_info *aux_info, int force, jmp_buf *setjmp_env)
 {
 	unsigned int i;
-	for (i = 0; i < aux_info.groups; i++) {
-		u32 block = ext4_allocate_blocks_from_block_group(1, i);
+	for (i = 0; i < aux_info->groups; i++) {
+		u32 block =
+		    ext4_allocate_blocks_from_block_group(aux_info, force,
+							  setjmp_env, 1, i);
 
 		if (block != EXT4_ALLOCATE_FAILED)
 			return block;
@@ -372,14 +396,17 @@ u32 allocate_block()
 	return EXT4_ALLOCATE_FAILED;
 }
 
-static struct region *ext4_allocate_best_fit_partial(u32 len)
+static struct region *ext4_allocate_best_fit_partial(struct fs_aux_info
+						     *aux_info, int force,
+						     jmp_buf *setjmp_env,
+						     u32 len)
 {
 	unsigned int i;
 	unsigned int found_bg = 0;
 	u32 found_bg_len = 0;
 
-	for (i = 0; i < aux_info.groups; i++) {
-		u32 bg_len = aux_info.bgs[i].free_blocks;
+	for (i = 0; i < aux_info->groups; i++) {
+		u32 bg_len = aux_info->bgs[i].free_blocks;
 
 		if ((len <= bg_len && (found_bg_len == 0 || bg_len < found_bg_len)) ||
 		    (len > found_bg_len && bg_len > found_bg_len)) {
@@ -391,9 +418,15 @@ static struct region *ext4_allocate_best_fit_partial(u32 len)
 	if (found_bg_len) {
 		u32 allocate_len = min(len, found_bg_len);
 		struct region *reg;
-		u32 block = ext4_allocate_blocks_from_block_group(allocate_len, found_bg);
+		u32 block = ext4_allocate_blocks_from_block_group(aux_info,
+								  force,
+								  setjmp_env,
+								  allocate_len,
+								  found_bg);
 		if (block == EXT4_ALLOCATE_FAILED) {
-			error("failed to allocate %d blocks in block group %d", allocate_len, found_bg);
+			error(force, setjmp_env,
+			      "failed to allocate %d blocks in block group %d",
+			      allocate_len, found_bg);
 			return NULL;
 		}
 		reg = malloc(sizeof(struct region));
@@ -404,20 +437,24 @@ static struct region *ext4_allocate_best_fit_partial(u32 len)
 		reg->bg = found_bg;
 		return reg;
 	} else {
-		error("failed to allocate %u blocks, out of space?", len);
+		error(force, setjmp_env,
+		      "failed to allocate %u blocks, out of space?", len);
 	}
 
 	return NULL;
 }
 
-static struct region *ext4_allocate_best_fit(u32 len)
+static struct region *ext4_allocate_best_fit(struct fs_aux_info *aux_info,
+					     int force, jmp_buf *setjmp_env,
+					     u32 len)
 {
 	struct region *first_reg = NULL;
 	struct region *prev_reg = NULL;
 	struct region *reg;
 
 	while (len > 0) {
-		reg = ext4_allocate_best_fit_partial(len);
+		reg = ext4_allocate_best_fit_partial(aux_info, force,
+						     setjmp_env, len);
 		if (reg == NULL)
 			return NULL;
 
@@ -443,9 +480,12 @@ static struct region *ext4_allocate_best_fit(u32 len)
           allocate the largest contiguous region and loop
       2.  Otherwise, allocate the smallest contiguous region that it fits in
 */
-struct block_allocation *allocate_blocks(u32 len)
+struct block_allocation *allocate_blocks(struct fs_aux_info *aux_info,
+					 int force, jmp_buf *setjmp_env,
+					 u32 len)
 {
-	struct region *reg = ext4_allocate_best_fit(len);
+	struct region *reg = ext4_allocate_best_fit(aux_info, force, setjmp_env,
+						    len);
 
 	if (reg == NULL)
 		return NULL;
@@ -524,9 +564,9 @@ void get_next_region(struct block_allocation *alloc)
 }
 
 /* Returns the number of free blocks in a block group */
-u32 get_free_blocks(u32 bg)
+u32 get_free_blocks(struct fs_aux_info *aux_info, u32 bg)
 {
-	return aux_info.bgs[bg].free_blocks;
+	return aux_info->bgs[bg].free_blocks;
 }
 
 int last_region(struct block_allocation *alloc)
@@ -639,12 +679,15 @@ int advance_oob_blocks(struct block_allocation *alloc, int blocks)
 	return advance_list_ptr(&alloc->oob_list, blocks);
 }
 
-int append_oob_allocation(struct block_allocation *alloc, u32 len)
+int append_oob_allocation(struct fs_aux_info *aux_info, int force,
+			  jmp_buf *setjmp_env, struct block_allocation *alloc,
+			  u32 len)
 {
-	struct region *reg = ext4_allocate_best_fit(len);
+	struct region *reg = ext4_allocate_best_fit(aux_info, force, setjmp_env,
+						    len);
 
 	if (reg == NULL) {
-		error("failed to allocate %d blocks", len);
+		error(force, setjmp_env, "failed to allocate %d blocks", len);
 		return -1;
 	}
 
@@ -655,107 +698,116 @@ int append_oob_allocation(struct block_allocation *alloc, u32 len)
 }
 
 /* Returns an ext4_inode structure for an inode number */
-struct ext4_inode *get_inode(u32 inode)
+struct ext4_inode *get_inode(struct fs_info *info, struct fs_aux_info *aux_info,
+			     struct sparse_file *ext4_sparse_file,
+			     jmp_buf *setjmp_env, u32 inode)
 {
 	inode -= 1;
-	int bg = inode / info.inodes_per_group;
-	inode %= info.inodes_per_group;
+	int bg = inode / info->inodes_per_group;
+	inode %= info->inodes_per_group;
 
-	allocate_bg_inode_table(&aux_info.bgs[bg]);
-	return (struct ext4_inode *)(aux_info.bgs[bg].inode_table + inode *
-		info.inode_size);
+	allocate_bg_inode_table(info, aux_info, ext4_sparse_file, setjmp_env,
+				bg);
+	return (struct ext4_inode *)(aux_info->bgs[bg].inode_table + inode *
+		info->inode_size);
 }
 
-struct ext4_xattr_header *get_xattr_block_for_inode(struct ext4_inode *inode)
+struct ext4_xattr_header *get_xattr_block_for_inode(struct fs_info *info,
+					struct fs_aux_info *aux_info,
+					struct sparse_file *ext4_sparse_file,
+					int force, jmp_buf *setjmp_env,
+					struct ext4_inode *inode)
 {
-	struct ext4_xattr_header *block = xattr_list_find(inode);
+	struct ext4_xattr_header *block = xattr_list_find(aux_info, inode);
 	if (block != NULL)
 		return block;
 
-	u32 block_num = allocate_block();
-	block = calloc(info.block_size, 1);
+	u32 block_num = allocate_block(aux_info, force, setjmp_env);
+	block = calloc(info->block_size, 1);
 	if (block == NULL) {
-		error("get_xattr: failed to allocate %d", info.block_size);
+		error(force, setjmp_env, "get_xattr: failed to allocate %d",
+		      info->block_size);
 		return NULL;
 	}
 
 	block->h_magic = cpu_to_le32(EXT4_XATTR_MAGIC);
 	block->h_refcount = cpu_to_le32(1);
 	block->h_blocks = cpu_to_le32(1);
-	inode->i_blocks_lo = cpu_to_le32(le32_to_cpu(inode->i_blocks_lo) + (info.block_size / 512));
+	inode->i_blocks_lo = cpu_to_le32(le32_to_cpu(inode->i_blocks_lo) + (info->block_size / 512));
 	inode->i_file_acl_lo = cpu_to_le32(block_num);
 
-	int result = sparse_file_add_data(ext4_sparse_file, block, info.block_size, block_num);
+	int result = sparse_file_add_data(ext4_sparse_file, block, info->block_size, block_num);
 	if (result != 0) {
-		error("get_xattr: sparse_file_add_data failure %d", result);
+		error(force, setjmp_env,
+		      "get_xattr: sparse_file_add_data failure %d", result);
 		free(block);
 		return NULL;
 	}
-	xattr_list_insert(inode, block);
+	xattr_list_insert(aux_info, inode, block);
 	return block;
 }
 
 /* Mark the first len inodes in a block group as used */
-u32 reserve_inodes(int bg, u32 num)
+u32 reserve_inodes(struct fs_aux_info *aux_info, int bg, u32 num)
 {
 	unsigned int i;
 	u32 inode;
 
-	if (get_free_inodes(bg) < num)
+	if (get_free_inodes(aux_info, bg) < num)
 		return EXT4_ALLOCATE_FAILED;
 
 	for (i = 0; i < num; i++) {
-		inode = aux_info.bgs[bg].first_free_inode + i - 1;
-		aux_info.bgs[bg].inode_bitmap[inode / 8] |= 1 << (inode % 8);
+		inode = aux_info->bgs[bg].first_free_inode + i - 1;
+		aux_info->bgs[bg].inode_bitmap[inode / 8] |= 1 << (inode % 8);
 	}
 
-	inode = aux_info.bgs[bg].first_free_inode;
+	inode = aux_info->bgs[bg].first_free_inode;
 
-	aux_info.bgs[bg].first_free_inode += num;
-	aux_info.bgs[bg].free_inodes -= num;
+	aux_info->bgs[bg].first_free_inode += num;
+	aux_info->bgs[bg].free_inodes -= num;
 
 	return inode;
 }
 
 /* Returns the first free inode number
    TODO: Inodes should be allocated in the block group of the data? */
-u32 allocate_inode()
+u32 allocate_inode(struct fs_info *info, struct fs_aux_info *aux_info)
 {
 	unsigned int bg;
 	u32 inode;
 
-	for (bg = 0; bg < aux_info.groups; bg++) {
-		inode = reserve_inodes(bg, 1);
+	for (bg = 0; bg < aux_info->groups; bg++) {
+		inode = reserve_inodes(aux_info, bg, 1);
 		if (inode != EXT4_ALLOCATE_FAILED)
-			return bg * info.inodes_per_group + inode;
+			return bg * info->inodes_per_group + inode;
 	}
 
 	return EXT4_ALLOCATE_FAILED;
 }
 
 /* Returns the number of free inodes in a block group */
-u32 get_free_inodes(u32 bg)
+u32 get_free_inodes(struct fs_aux_info *aux_info, u32 bg)
 {
-	return aux_info.bgs[bg].free_inodes;
+	return aux_info->bgs[bg].free_inodes;
 }
 
 /* Increments the directory count of the block group that contains inode */
-void add_directory(u32 inode)
+void add_directory(struct fs_info *info, struct fs_aux_info *aux_info, u32 inode)
 {
-	int bg = (inode - 1) / info.inodes_per_group;
-	aux_info.bgs[bg].used_dirs += 1;
+	int bg = (inode - 1) / info->inodes_per_group;
+	aux_info->bgs[bg].used_dirs += 1;
 }
 
 /* Returns the number of inodes in a block group that are directories */
-u16 get_directories(int bg)
+u16 get_directories(struct fs_aux_info *aux_info, int bg)
 {
-	return aux_info.bgs[bg].used_dirs;
+	return aux_info->bgs[bg].used_dirs;
 }
 
 /* Returns the flags for a block group */
-u16 get_bg_flags(int bg)
+u16 get_bg_flags(struct fs_aux_info *aux_info, int bg)
 {
-	return aux_info.bgs[bg].flags;
+	return aux_info->bgs[bg].flags;
 }
 
 /* Frees the memory used by a linked list of allocation regions */
