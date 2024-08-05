@@ -54,12 +54,12 @@ $(BUILD_DIR)/make_ext4fs: $(OBJ) $(SPARSE_OBJ)
 	$(CC) $(LDFLAGS) -o $@ $^ $(ZLIB)
 
 .PHONY:check-device
-check-device: tests/build-and-test.sh
+check-device: tests/build-and-test.sh $(BUILD_DIR)/make_ext4fs
 	BUILD_DIR=$(BUILD_DIR) $<
 	@echo SUCCESS $@
 
 .PHONY: check-blockfile
-check-blockfile: tests/build-and-test.sh
+check-blockfile: tests/build-and-test.sh $(BUILD_DIR)/make_ext4fs
 	DIRECT_BLOCKFILE=1 BUILD_DIR=$(BUILD_DIR) $<
 	@echo SUCCESS $@
 

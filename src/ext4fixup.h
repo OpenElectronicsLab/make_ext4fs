@@ -13,8 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#ifndef EXT4FIXUP_H
+#define EXTRFIXUP_H
 
-int ext4fixup(char *fsdev);
-int ext4fixup_internal(char *fsdev, int v_flag, int n_flag,
-                       int stop_phase, int stop_loc, int stop_count);
+int ext4fixup(struct fs_info *info, struct fs_aux_info *aux_info, int verbose,
+	      int force, jmp_buf *setjmp_env, int no_write, char *fsdev);
 
+int ext4fixup_internal(struct fs_info *info, struct fs_aux_info *aux_info,
+		       int force, jmp_buf *setjmp_env, char *fsdev, int verbose,
+		       int no_write, int stop_phase, int stop_loc,
+		       int stop_count);
+
+#endif /* #ifndef EXT4FIXUP_H */

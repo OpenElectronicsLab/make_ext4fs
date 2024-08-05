@@ -42,14 +42,35 @@ extern "C" {
 #include <stdint.h>
 
 #include "ext4_sb.h"
+struct sparse_file;
+struct block_allocation;
 
-extern int force;
+// TODO: replace stderr with FILE *log
 
-#define warn(fmt, args...) do { fprintf(stderr, "warning: %s: " fmt "\n", __func__, ## args); } while (0)
-#define error(fmt, args...) do { fprintf(stderr, "error: %s: " fmt "\n", __func__, ## args); if (!force) longjmp(setjmp_env, EXIT_FAILURE); } while (0)
-#define error_errno(s, args...) error(s ": %s", ##args, strerror(errno))
-#define critical_error(fmt, args...) do { fprintf(stderr, "critical error: %s: " fmt "\n", __func__, ## args); longjmp(setjmp_env, EXIT_FAILURE); } while (0)
-#define critical_error_errno(s, args...) critical_error(s ": %s", ##args, strerror(errno))
+#define warn(fmt, args...) \
+	do { \
+		fprintf(stderr, "warning: %s: " fmt "\n", __func__, ##args); \
+	} while (0)
+
+#define error(force, jmpbuf_ptr, fmt, args...) \
+	do { \
+		fprintf(stderr, "error: %s: " fmt "\n", __func__, ##args); \
+		if (!force) \
+			longjmp(*jmpbuf_ptr, EXIT_FAILURE); \
+	} while (0)
+
+#define error_errno(force, jmpbuf_ptr, s, args...) \
+	error(force, jmpbuf_ptr, s ": %s", ##args, strerror(errno))
+
+#define critical_error(jmpbuf_ptr, fmt, args...) \
+	do { \
+		fprintf(stderr, "critical error: %s: " fmt "\n", \
+			__func__, ## args); \
+		longjmp(*jmpbuf_ptr, EXIT_FAILURE); \
+	} while (0)
+
+#define critical_error_errno(jmpbuf_ptr, s, args...) \
+	critical_error(jmpbuf_ptr, s ": %s", ##args, strerror(errno))
 
 #define EXT4_JNL_BACKUP_BLOCKS 1
 
@@ -76,6 +97,12 @@ typedef signed long long s64;
 typedef unsigned int u32;
 typedef unsigned short int u16;
 typedef unsigned char u8;
+
+struct fs_config_list;
+typedef int (*fs_config_func_t)(struct fs_config_list *config_list,
+				const char *path, int dir, unsigned *uid,
+				unsigned *gid, unsigned *mode,
+				uint64_t *capabilities);
 
 struct block_group_info;
 struct xattr_list_element;
@@ -110,12 +137,7 @@ struct fs_aux_info {
 	u32 blocks_per_tind;
 };
 
-extern struct fs_info info;
-extern struct fs_aux_info aux_info;
-extern struct sparse_file *ext4_sparse_file;
-extern int uuid_user_specified;
-
-extern jmp_buf setjmp_env;
+// extern jmp_buf setjmp_env;
 
 static inline int log_2(int j)
 {
@@ -129,38 +151,51 @@ static inline int log_2(int j)
 
 int bitmap_get_bit(u8 *bitmap, u32 bit);
 void bitmap_clear_bit(u8 *bitmap, u32 bit);
-int ext4_bg_has_super_block(int bg);
-void read_sb(int fd, struct ext4_super_block *sb);
-void write_sb(int fd, unsigned long long offset, struct ext4_super_block *sb);
-void write_ext4_image(int fd, int gz, int sparse, int crc);
-void ext4_create_fs_aux_info(void);
-void ext4_free_fs_aux_info(void);
-void ext4_fill_in_sb(void);
-void ext4_create_resize_inode(void);
-void ext4_create_journal_inode(void);
-void ext4_update_free(void);
-void ext4_queue_sb(void);
+int ext4_bg_has_super_block(struct fs_info *info, int bg);
+void read_sb(jmp_buf *setjmp_env, int fd, struct ext4_super_block *sb);
+void write_sb(jmp_buf *setjmp_env, int fd, unsigned long long offset,
+	      struct ext4_super_block *sb);
+void write_ext4_image(struct sparse_file *ext4_sparse_file, int fd, int gz,
+		      int sparse, int crc);
+void ext4_init_fs_aux_info(struct fs_info *info, struct fs_aux_info *aux_info,
+			   jmp_buf *setjmp_env);
+void ext4_free_fs_aux_info(struct fs_aux_info *aux_info);
+void ext4_fill_in_sb(struct fs_info *info, struct fs_aux_info *aux_info,
+		     struct sparse_file *ext4_sparse_file);
+void ext4_create_resize_inode(struct fs_info *info,
+			      struct fs_aux_info *aux_info,
+			      struct sparse_file *ext4_sparse_file,
+			      int force, jmp_buf *setjmp_env);
+void ext4_create_journal_inode(struct fs_info *info,
+			       struct fs_aux_info *aux_info,
+			       struct sparse_file *ext4_sparse_file,
+			       int force, jmp_buf *setjmp_env);
+void ext4_update_free(struct fs_aux_info *aux_info);
+void ext4_queue_sb(struct fs_info *info, struct fs_aux_info *aux_info,
+		   struct sparse_file *ext4_sparse_file);
 u64 get_block_device_size(int fd);
 int is_block_device_fd(int fd);
-u64 get_file_size(int fd);
+u64 get_file_size(struct fs_info *info, int fd);
 u64 parse_num(const char *arg);
-void ext4_parse_sb_info(struct ext4_super_block *sb);
+void ext4_parse_sb_info(struct fs_info *info, struct fs_aux_info *aux_info,
+			int force, jmp_buf *setjmp_env,
+			struct ext4_super_block *sb);
 u16 ext4_crc16(u16 crc_in, const void *buf, int size);
 uint8_t *parse_uuid(uint8_t bytes[16], const char *str, size_t len);
 char *uuid_bin_to_str(char *buf, size_t buf_size, const uint8_t bytes[16]);
 
-typedef int (*fs_config_func_t)(const char *path, int dir, unsigned *uid, unsigned *gid,
-		unsigned *mode, uint64_t *capabilities);
+int make_ext4fs_internal(struct fs_info *info, struct fs_aux_info *aux_info,
+			 struct sparse_file *ext4_sparse_file,
+			 struct block_allocation *saved_allocation_head,
+			 struct fs_config_list *config_list,
+			 int force, jmp_buf *setjmp_env,
+			 int uuid_user_specified, int fd,
+			 const char *directory, fs_config_func_t fs_config_func,
+			 int gzip, int sparse, int crc, int wipe, int verbose,
+			 time_t fixed_time, FILE* block_list_file);
 
-struct selabel_handle;
-
-int make_ext4fs_internal(int fd, const char *directory,
-						 fs_config_func_t fs_config_func, int gzip,
-						 int sparse, int crc, int wipe,
-						 int verbose, time_t fixed_time,
-						 FILE* block_list_file);
-
-int read_ext(int fd, int verbose);
+int read_ext(struct fs_info *info, struct fs_aux_info *aux_info, int force,
+	     jmp_buf *setjmp_env, int fd, int verbose);
 
 #ifdef __cplusplus
 }

@@ -18,6 +18,7 @@
 #define _LIBSPARSE_SPARSE_H_
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #ifdef	__cplusplus
@@ -203,6 +204,8 @@ int sparse_file_callback(struct sparse_file *s, bool sparse, bool crc,
  * @fd - file descriptor to read from
  * @sparse - read a file in the Android sparse file format
  * @crc - verify the crc of a file in the Android sparse file format
+ * @copybuf - the buffer for reading
+ * @copybuf_size - the size in bytes of the buffer
  *
  * Reads a file into a sparse file cookie.  If sparse is true, the file is
  * assumed to be in the Android sparse file format.  If sparse is false, the
@@ -212,7 +215,8 @@ int sparse_file_callback(struct sparse_file *s, bool sparse, bool crc,
  *
  * Returns 0 on success, negative errno on error.
  */
-int sparse_file_read(struct sparse_file *s, int fd, bool sparse, bool crc);
+int sparse_file_read(struct sparse_file *s, int fd, bool sparse, bool crc,
+		     char *copybuf, size_t copybuf_size);
 
 /**
  * sparse_file_import - import an existing sparse file
@@ -220,6 +224,8 @@ int sparse_file_read(struct sparse_file *s, int fd, bool sparse, bool crc);
  * @s - sparse file cookie
  * @verbose - print verbose errors while reading the sparse file
  * @crc - verify the crc of a file in the Android sparse file format
+ * @copybuf - the buffer for reading
+ * @copybuf_size - the size in bytes of the buffer
  *
  * Reads an existing sparse file into a sparse file cookie, recreating the same
  * sparse cookie that was used to write it.  If verbose is true, prints verbose
@@ -227,7 +233,8 @@ int sparse_file_read(struct sparse_file *s, int fd, bool sparse, bool crc);
  *
  * Returns a new sparse file cookie on success, NULL on error.
  */
-struct sparse_file *sparse_file_import(int fd, bool verbose, bool crc);
+struct sparse_file *sparse_file_import(int fd, bool verbose, bool crc,
+				       char *copybuf, size_t copybuf_size);
 
 /**
  * sparse_file_import_auto - import an existing sparse or normal file
@@ -235,6 +242,8 @@ struct sparse_file *sparse_file_import(int fd, bool verbose, bool crc);
  * @fd - file descriptor to read from
  * @crc - verify the crc of a file in the Android sparse file format
  * @verbose - whether to use verbose logging
+ * @copybuf - the buffer for reading
+ * @copybuf_size - the size in bytes of the buffer
  *
  * Reads an existing sparse or normal file into a sparse file cookie.
  * Attempts to determine if the file is sparse or not by looking for the sparse
@@ -244,7 +253,8 @@ struct sparse_file *sparse_file_import(int fd, bool verbose, bool crc);
  *
  * Returns a new sparse file cookie on success, NULL on error.
  */
-struct sparse_file *sparse_file_import_auto(int fd, bool crc, bool verbose);
+struct sparse_file *sparse_file_import_auto(int fd, bool crc, bool verbose,
+					    char *copybuf, size_t copybuf_size);
 
 /** sparse_file_resparse - rechunk an existing sparse file into smaller files
  *

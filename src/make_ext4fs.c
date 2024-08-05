@@ -45,7 +45,11 @@ static int filter_dot(const struct dirent *d)
 	return (strcmp(d->d_name, "..") && strcmp(d->d_name, "."));
 }
 
-static u32 build_default_directory_structure(time_t fixed_time)
+static u32 build_default_directory_structure(struct fs_info *info,
+					     struct fs_aux_info *aux_info,
+					     struct sparse_file *ext4_sparse_file,
+					     int force, jmp_buf *setjmp_env,
+					     time_t fixed_time)
 {
 	u32 inode;
 	u32 root_inode;
@@ -57,11 +61,14 @@ static u32 build_default_directory_structure(time_t fixed_time)
 		.gid = 0,
 		.mtime = (fixed_time != -1) ? fixed_time : 0,
 	};
-	root_inode = make_directory(0, 1, &dentries, 1);
-	inode = make_directory(root_inode, 0, NULL, 0);
+	root_inode = make_directory(info, aux_info, ext4_sparse_file, force,
+				    setjmp_env, 0, 1, &dentries, 1);
+	inode = make_directory(info, aux_info, ext4_sparse_file, force,
+			       setjmp_env, root_inode, 0, NULL, 0);
 	*dentries.inode = inode;
-	inode_set_permissions(inode, dentries.mode,
-	        dentries.uid, dentries.gid, dentries.mtime);
+	inode_set_permissions(info, aux_info, ext4_sparse_file, setjmp_env,
+			      inode, dentries.mode, dentries.uid, dentries.gid,
+			      dentries.mtime);
 
 	return root_inode;
 }
@@ -73,9 +80,18 @@ static u32 build_default_directory_structure(time_t fixed_time)
    that does not exist on disk (e.g. lost+found).
    dir_path is an absolute path, with trailing slash, to the same directory
    if the image were mounted at the specified mount point */
-static u32 build_directory_structure(const char *full_path, const char *dir_path,
-		u32 dir_inode, fs_config_func_t fs_config_func,
-		int verbose, time_t fixed_time)
+static u32 build_directory_structure(struct fs_info *info,
+				     struct fs_aux_info *aux_info,
+				     struct sparse_file *ext4_sparse_file,
+				     struct block_allocation
+				     *saved_allocation_head,
+				     struct fs_config_list *config_list,
+				     int force, jmp_buf *setjmp_env,
+				     const char *full_path,
+				     const char *dir_path,
+				     u32 dir_inode,
+				     fs_config_func_t fs_config_func,
+				     int verbose, time_t fixed_time)
 {
 	int entries = 0;
 	struct dentry *dentries;
@@ -103,7 +119,7 @@ static u32 build_directory_structure(const char *full_path, const char *dir_path
 				entries = scandir(full_path, &namelist, filter_dot, (void*)alphasort);
 #endif
 			if (entries < 0) {
-				error_errno("scandir");
+				error_errno(force, setjmp_env, "scandir");
 				return EXT4_ALLOCATE_FAILED;
 			}
 		}
@@ -120,12 +136,12 @@ static u32 build_directory_structure(const char *full_path, const char *dir_path
 
 	dentries = calloc(entries, sizeof(struct dentry));
 	if (dentries == NULL)
-		critical_error_errno("malloc");
+		critical_error_errno(setjmp_env, "malloc");
 
 	for (i = 0; i < entries; i++) {
 		dentries[i].filename = strdup(namelist[i]->d_name);
 		if (dentries[i].filename == NULL)
-			critical_error_errno("strdup");
+			critical_error_errno(setjmp_env, "strdup");
 
 		asprintf(&dentries[i].path, "%s%s", dir_path, namelist[i]->d_name);
 		asprintf(&dentries[i].full_path, "%s%s", full_path, namelist[i]->d_name);
@@ -134,7 +150,7 @@ static u32 build_directory_structure(const char *full_path, const char *dir_path
 
 		ret = lstat(dentries[i].full_path, &stat);
 		if (ret < 0) {
-			error_errno("lstat");
+			error_errno(force, setjmp_env, "lstat");
 			i--;
 			entries--;
 			continue;
@@ -153,7 +169,8 @@ static u32 build_directory_structure(const char *full_path, const char *dir_path
 			unsigned int uid = 0;
 			unsigned int gid = 0;
 			int dir = S_ISDIR(stat.st_mode);
-			if (fs_config_func(dentries[i].path, dir, &uid, &gid, &mode, &capabilities)) {
+			if (fs_config_func(config_list, dentries[i].path, dir,
+					   &uid, &gid, &mode, &capabilities)) {
 				dentries[i].mode = mode;
 				dentries[i].uid = uid;
 				dentries[i].gid = gid;
@@ -176,10 +193,10 @@ static u32 build_directory_structure(const char *full_path, const char *dir_path
 			dentries[i].file_type = EXT4_FT_SOCK;
 		} else if (S_ISLNK(stat.st_mode)) {
 			dentries[i].file_type = EXT4_FT_SYMLINK;
-			dentries[i].link = calloc(info.block_size, 1);
-			readlink(dentries[i].full_path, dentries[i].link, info.block_size - 1);
+			dentries[i].link = calloc(info->block_size, 1);
+			readlink(dentries[i].full_path, dentries[i].link, info->block_size - 1);
 		} else {
-			error("unknown file type on %s", dentries[i].path);
+		error(force, setjmp_env, "unknown file type on %s", dentries[i].path);
 			i--;
 			entries--;
 		}
@@ -205,48 +222,71 @@ static u32 build_directory_structure(const char *full_path, const char *dir_path
 		dirs++;
 	}
 
-	inode = make_directory(dir_inode, entries, dentries, dirs);
+	inode = make_directory(info, aux_info, ext4_sparse_file, force,
+			       setjmp_env, dir_inode, entries, dentries, dirs);
 
 	for (i = 0; i < entries; i++) {
 		if (dentries[i].file_type == EXT4_FT_REG_FILE) {
-			entry_inode = make_file(dentries[i].full_path, dentries[i].size);
+			entry_inode = make_file(info, aux_info,
+						ext4_sparse_file,
+						saved_allocation_head,
+						force, setjmp_env,
+						dentries[i].full_path,
+						dentries[i].size);
 		} else if (dentries[i].file_type == EXT4_FT_DIR) {
 			char *subdir_full_path = NULL;
 			char *subdir_dir_path;
 			if (dentries[i].full_path) {
 				ret = asprintf(&subdir_full_path, "%s/", dentries[i].full_path);
 				if (ret < 0)
-					critical_error_errno("asprintf");
+					critical_error_errno(setjmp_env, "asprintf");
 			}
 			ret = asprintf(&subdir_dir_path, "%s/", dentries[i].path);
 			if (ret < 0)
-				critical_error_errno("asprintf");
-			entry_inode = build_directory_structure(subdir_full_path,
-					subdir_dir_path, inode, fs_config_func, verbose, fixed_time);
+				critical_error_errno(setjmp_env, "asprintf");
+			entry_inode = build_directory_structure(info, aux_info,
+					ext4_sparse_file, saved_allocation_head,
+					config_list, force, setjmp_env,
+					subdir_full_path, subdir_dir_path,
+					inode, fs_config_func, verbose,
+					fixed_time);
 			free(subdir_full_path);
 			free(subdir_dir_path);
 		} else if (dentries[i].file_type == EXT4_FT_SYMLINK) {
-			entry_inode = make_link(dentries[i].link);
+			entry_inode = make_link(info, aux_info,
+						ext4_sparse_file, force,
+						setjmp_env, dentries[i].link);
 		} else if (dentries[i].file_type == EXT4_FT_CHRDEV ||
 		           dentries[i].file_type == EXT4_FT_BLKDEV ||
 		           dentries[i].file_type == EXT4_FT_SOCK ||
 		           dentries[i].file_type == EXT4_FT_FIFO) {
-			entry_inode = make_special(dentries[i].full_path);
+			entry_inode = make_special(info, aux_info,
+						   ext4_sparse_file, force,
+						   setjmp_env,
+						   dentries[i].full_path);
 		} else {
-			error("unknown file type on %s", dentries[i].path);
+			error(force, setjmp_env, "unknown file type on %s",
+			      dentries[i].path);
 			entry_inode = 0;
 		}
 		*dentries[i].inode = entry_inode;
 
-		ret = inode_set_permissions(entry_inode, dentries[i].mode,
-			dentries[i].uid, dentries[i].gid,
-			dentries[i].mtime);
+		ret = inode_set_permissions(info, aux_info, ext4_sparse_file,
+					    setjmp_env, entry_inode,
+					    dentries[i].mode, dentries[i].uid,
+					    dentries[i].gid, dentries[i].mtime);
 		if (ret)
-			error("failed to set permissions on %s\n", dentries[i].path);
+			error(force, setjmp_env,
+			      "failed to set permissions on %s",
+			      dentries[i].path);
 
-		ret = inode_set_capabilities(entry_inode, dentries[i].capabilities);
+		ret = inode_set_capabilities(info, aux_info, ext4_sparse_file,
+					     force, setjmp_env, entry_inode,
+					     dentries[i].capabilities);
 		if (ret)
-			error("failed to set capability on %s\n", dentries[i].path);
+			error(force, setjmp_env,
+			      "failed to set capability on %s",
+			      dentries[i].path);
 
 		free(dentries[i].path);
 		free(dentries[i].full_path);
@@ -263,9 +303,9 @@ static u32 compute_block_size(void)
 	return 4096;
 }
 
-static u32 compute_journal_blocks(void)
+static u32 compute_journal_blocks(struct fs_info *info)
 {
-	u32 journal_blocks = DIV_ROUND_UP(info.len, info.block_size) / 64;
+	u32 journal_blocks = DIV_ROUND_UP(info->len, info->block_size) / 64;
 	if (journal_blocks < 1024)
 		journal_blocks = 1024;
 	if (journal_blocks > 32768)
@@ -273,44 +313,44 @@ static u32 compute_journal_blocks(void)
 	return journal_blocks;
 }
 
-static u32 compute_blocks_per_group(void)
+static u32 compute_blocks_per_group(struct fs_info *info)
 {
-	return info.block_size * 8;
+	return info->block_size * 8;
 }
 
-static u32 compute_inodes(void)
+static u32 compute_inodes(struct fs_info *info)
 {
-	return DIV_ROUND_UP(info.len, info.block_size) / 4;
+	return DIV_ROUND_UP(info->len, info->block_size) / 4;
 }
 
-static u32 compute_inodes_per_group(void)
+static u32 compute_inodes_per_group(struct fs_info *info)
 {
-	u32 blocks = DIV_ROUND_UP(info.len, info.block_size);
-	u32 block_groups = DIV_ROUND_UP(blocks, info.blocks_per_group);
-	u32 inodes = DIV_ROUND_UP(info.inodes, block_groups);
-	inodes = EXT4_ALIGN(inodes, (info.block_size / info.inode_size));
+	u32 blocks = DIV_ROUND_UP(info->len, info->block_size);
+	u32 block_groups = DIV_ROUND_UP(blocks, info->blocks_per_group);
+	u32 inodes = DIV_ROUND_UP(info->inodes, block_groups);
+	inodes = EXT4_ALIGN(inodes, (info->block_size / info->inode_size));
 
 	/* After properly rounding up the number of inodes/group,
 	 * make sure to update the total inodes field in the info struct.
 	 */
-	info.inodes = inodes * block_groups;
+	info->inodes = inodes * block_groups;
 
 	return inodes;
 }
 
-static u32 compute_bg_desc_reserve_blocks(void)
+static u32 compute_bg_desc_reserve_blocks(struct fs_info *info)
 {
-	u32 blocks = DIV_ROUND_UP(info.len, info.block_size);
-	u32 block_groups = DIV_ROUND_UP(blocks, info.blocks_per_group);
+	u32 blocks = DIV_ROUND_UP(info->len, info->block_size);
+	u32 block_groups = DIV_ROUND_UP(blocks, info->blocks_per_group);
 	u32 bg_desc_blocks = DIV_ROUND_UP(block_groups * sizeof(struct ext2_group_desc),
-			info.block_size);
+			info->block_size);
 
 	u32 bg_desc_reserve_blocks =
 			DIV_ROUND_UP(block_groups * 1024 * sizeof(struct ext2_group_desc),
-					info.block_size) - bg_desc_blocks;
+					info->block_size) - bg_desc_blocks;
 
-	if (bg_desc_reserve_blocks > info.block_size / sizeof(u32))
-		bg_desc_reserve_blocks = info.block_size / sizeof(u32);
+	if (bg_desc_reserve_blocks > info->block_size / sizeof(u32))
+		bg_desc_reserve_blocks = info->block_size / sizeof(u32);
 
 	return bg_desc_reserve_blocks;
 }
@@ -319,7 +359,8 @@ static u32 compute_bg_desc_reserve_blocks(void)
    is guaranteed to have a trailing slash.  If absolute is true, the new string
    is also guaranteed to have a leading slash.
 */
-static char *canonicalize_slashes(const char *str, bool absolute)
+static char *canonicalize_slashes(jmp_buf *setjmp_env, const char *str,
+				  bool absolute)
 {
 	char *ret;
 	int len = strlen(str);
@@ -341,7 +382,7 @@ static char *canonicalize_slashes(const char *str, bool absolute)
 	}
 	ret = malloc(newlen + 1);
 	if (!ret) {
-		critical_error("malloc");
+		critical_error(setjmp_env, "malloc");
 	}
 
 	ptr = ret;
@@ -357,7 +398,7 @@ static char *canonicalize_slashes(const char *str, bool absolute)
 	}
 
 	if (ptr != ret + newlen) {
-		critical_error("assertion failed\n");
+		critical_error(setjmp_env, "assertion failed\n");
 	}
 
 	*ptr = '\0';
@@ -365,140 +406,150 @@ static char *canonicalize_slashes(const char *str, bool absolute)
 	return ret;
 }
 
-// static char *canonicalize_abs_slashes(const char *str)
-// {
-//	return canonicalize_slashes(str, true);
-// }
-
-static char *canonicalize_rel_slashes(const char *str)
+static char *canonicalize_rel_slashes(jmp_buf *setjmp_env, const char *str)
 {
-	return canonicalize_slashes(str, false);
+	return canonicalize_slashes(setjmp_env, str, false);
 }
 
-int make_ext4fs_internal(int fd, const char *_directory,
-						 fs_config_func_t fs_config_func, int gzip,
-						 int sparse, int crc, int wipe,
-						 int verbose, time_t fixed_time,
-						 FILE* block_list_file)
+int make_ext4fs_internal(struct fs_info *info, struct fs_aux_info *aux_info,
+		         struct sparse_file *ext4_sparse_file,
+			 struct block_allocation *saved_allocation_head,
+			 struct fs_config_list *config_list,
+			 int force, jmp_buf *setjmp_env,
+			 int uuid_user_specified, int fd,
+			 const char *_directory,
+			 fs_config_func_t fs_config_func, int gzip, int sparse,
+			 int crc, int wipe, int verbose, time_t fixed_time,
+			 FILE* block_list_file)
 {
 	u32 root_inode_num;
 	u16 root_mode;
 	char *directory = NULL;
 	char buf[40];
 
-	if (setjmp(setjmp_env))
+	if (setjmp(*setjmp_env))
 		return EXIT_FAILURE; /* Handle a call to longjmp() */
 
 	if (_directory)
-		directory = canonicalize_rel_slashes(_directory);
+		directory = canonicalize_rel_slashes(setjmp_env, _directory);
 
-	if (info.len <= 0)
-		info.len = get_file_size(fd);
+	if (info->len <= 0)
+		info->len = get_file_size(info, fd);
 
-	if (info.len <= 0) {
+	if (info->len <= 0) {
 		fprintf(stderr, "Need size of filesystem\n");
 		return EXIT_FAILURE;
 	}
 
 	ftruncate(fd, 0);
 
-	if (info.block_size <= 0)
-		info.block_size = compute_block_size();
+	if (info->block_size <= 0)
+		info->block_size = compute_block_size();
 
 	/* Round down the filesystem length to be a multiple of the block size */
-	info.len &= ~((u64)info.block_size - 1);
+	info->len &= ~((u64)info->block_size - 1);
 
-	if (info.journal_blocks == 0)
-		info.journal_blocks = compute_journal_blocks();
+	if (info->journal_blocks == 0)
+		info->journal_blocks = compute_journal_blocks(info);
 
-	if (info.no_journal == 0)
-		info.feat_compat = EXT4_FEATURE_COMPAT_HAS_JOURNAL;
+	if (info->no_journal == 0)
+		info->feat_compat = EXT4_FEATURE_COMPAT_HAS_JOURNAL;
 	else
-		info.journal_blocks = 0;
+		info->journal_blocks = 0;
 
-	if (info.blocks_per_group <= 0)
-		info.blocks_per_group = compute_blocks_per_group();
+	if (info->blocks_per_group <= 0)
+		info->blocks_per_group = compute_blocks_per_group(info);
 
-	if (info.inodes <= 0)
-		info.inodes = compute_inodes();
+	if (info->inodes <= 0)
+		info->inodes = compute_inodes(info);
 
-	if (info.inode_size <= 0)
-		info.inode_size = 256;
+	if (info->inode_size <= 0)
+		info->inode_size = 256;
 
-	if (info.label == NULL)
-		info.label = "";
+	if (info->label == NULL)
+		info->label = "";
 
-	info.inodes_per_group = compute_inodes_per_group();
+	info->inodes_per_group = compute_inodes_per_group(info);
 
-	info.feat_compat |=
+	info->feat_compat |=
 			EXT4_FEATURE_COMPAT_RESIZE_INODE |
 			EXT4_FEATURE_COMPAT_EXT_ATTR;
 
-	info.feat_ro_compat |=
+	info->feat_ro_compat |=
 			EXT4_FEATURE_RO_COMPAT_SPARSE_SUPER |
 			EXT4_FEATURE_RO_COMPAT_LARGE_FILE |
 			EXT4_FEATURE_RO_COMPAT_GDT_CSUM;
 
-	info.feat_incompat |=
+	info->feat_incompat |=
 			EXT4_FEATURE_INCOMPAT_EXTENTS |
 			EXT4_FEATURE_INCOMPAT_FILETYPE;
 
 
-	info.bg_desc_reserve_blocks = compute_bg_desc_reserve_blocks();
+	info->bg_desc_reserve_blocks = compute_bg_desc_reserve_blocks(info);
 
 	if (!uuid_user_specified) {
-		uuid5_generate(info.uuid, "extandroid/make_ext4fs", info.label);
+		uuid5_generate(info->uuid, "extandroid/make_ext4fs", info->label);
 	}
 
 	printf("Creating filesystem with parameters:\n");
-	printf("    Size: %"PRIu64"\n", info.len);
-	printf("    Block size: %d\n", info.block_size);
-	printf("    Blocks per group: %d\n", info.blocks_per_group);
-	printf("    Inodes per group: %d\n", info.inodes_per_group);
-	printf("    Inode size: %d\n", info.inode_size);
-	printf("    Journal blocks: %d\n", info.journal_blocks);
-	printf("    Label: %s\n", info.label);
-	printf("    UUID: %s\n", uuid_bin_to_str(buf, sizeof(buf), info.uuid));
+	printf("    Size: %"PRIu64"\n", info->len);
+	printf("    Block size: %d\n", info->block_size);
+	printf("    Blocks per group: %d\n", info->blocks_per_group);
+	printf("    Inodes per group: %d\n", info->inodes_per_group);
+	printf("    Inode size: %d\n", info->inode_size);
+	printf("    Journal blocks: %d\n", info->journal_blocks);
+	printf("    Label: %s\n", info->label);
+	printf("    UUID: %s\n", uuid_bin_to_str(buf, sizeof(buf), info->uuid));
 
-	ext4_create_fs_aux_info();
+	ext4_init_fs_aux_info(info, aux_info, setjmp_env);
 
-	printf("    Blocks: %"PRIu64"\n", aux_info.len_blocks);
-	printf("    Block groups: %d\n", aux_info.groups);
-	printf("    Reserved blocks: %"PRIu64"\n",  (aux_info.len_blocks / 100) * info.reserve_pcnt);
-	printf("    Reserved block group size: %d\n", info.bg_desc_reserve_blocks);
+	printf("    Blocks: %"PRIu64"\n", aux_info->len_blocks);
+	printf("    Block groups: %d\n", aux_info->groups);
+	printf("    Reserved blocks: %"PRIu64"\n",  (aux_info->len_blocks / 100) * info->reserve_pcnt);
+	printf("    Reserved block group size: %d\n", info->bg_desc_reserve_blocks);
 
-	ext4_sparse_file = sparse_file_new(info.block_size, info.len);
+	ext4_sparse_file = sparse_file_new(info->block_size, info->len);
 
-	block_allocator_init();
+	block_allocator_init(info, aux_info, ext4_sparse_file, force,
+			     setjmp_env);
 
-	ext4_fill_in_sb();
+	ext4_fill_in_sb(info, aux_info, ext4_sparse_file);
 
-	if (reserve_inodes(0, 10) == EXT4_ALLOCATE_FAILED)
-		error("failed to reserve first 10 inodes");
+	if (reserve_inodes(aux_info, 0, 10) == EXT4_ALLOCATE_FAILED)
+		error(force, setjmp_env, "failed to reserve first 10 inodes");
 
-	if (info.feat_compat & EXT4_FEATURE_COMPAT_HAS_JOURNAL)
-		ext4_create_journal_inode();
+	if (info->feat_compat & EXT4_FEATURE_COMPAT_HAS_JOURNAL)
+		ext4_create_journal_inode(info, aux_info, ext4_sparse_file,
+					  force, setjmp_env);
 
-	if (info.feat_compat & EXT4_FEATURE_COMPAT_RESIZE_INODE)
-		ext4_create_resize_inode();
+	if (info->feat_compat & EXT4_FEATURE_COMPAT_RESIZE_INODE)
+		ext4_create_resize_inode(info, aux_info, ext4_sparse_file,
+					 force, setjmp_env);
 
 	if (directory)
-		root_inode_num = build_directory_structure(directory, "", 0,
-			fs_config_func, verbose, fixed_time);
+		root_inode_num = build_directory_structure(info, aux_info,
+					ext4_sparse_file,
+					saved_allocation_head,
+					config_list, force, setjmp_env,
+					directory, "", 0, fs_config_func,
+					verbose, fixed_time);
 	else
-		root_inode_num = build_default_directory_structure(fixed_time);
+		root_inode_num = build_default_directory_structure(info,
+					aux_info, ext4_sparse_file, force,
+					setjmp_env, fixed_time);
 
 	root_mode = S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
-	inode_set_permissions(root_inode_num, root_mode, 0, 0,
-		(fixed_time != 1) ? fixed_time : 0);
+	inode_set_permissions(info, aux_info, ext4_sparse_file, setjmp_env,
+			      root_inode_num, root_mode, 0, 0,
+			      (fixed_time != 1) ? fixed_time : 0);
 
-	ext4_update_free();
+	ext4_update_free(aux_info);
 
-	ext4_queue_sb();
+	ext4_queue_sb(info, aux_info, ext4_sparse_file);
 
 	if (block_list_file) {
 		size_t dirlen = strlen(directory);
-		struct block_allocation* p = get_saved_allocation_chain();
+		struct block_allocation* p = saved_allocation_head;
 		while (p) {
 			if (strncmp(p->filename, directory, dirlen) == 0) {
 				fprintf(block_list_file, "%s", p->filename + dirlen);
@@ -513,16 +564,16 @@ int make_ext4fs_internal(int fd, const char *_directory,
 	}
 
 	printf("Created filesystem with %d/%d inodes and %d/%d blocks\n",
-			aux_info.sb->s_inodes_count - aux_info.sb->s_free_inodes_count,
-			aux_info.sb->s_inodes_count,
-			aux_info.sb->s_blocks_count_lo - aux_info.sb->s_free_blocks_count_lo,
-			aux_info.sb->s_blocks_count_lo);
+			aux_info->sb->s_inodes_count - aux_info->sb->s_free_inodes_count,
+			aux_info->sb->s_inodes_count,
+			aux_info->sb->s_blocks_count_lo - aux_info->sb->s_free_blocks_count_lo,
+			aux_info->sb->s_blocks_count_lo);
 
 	if (wipe && WIPE_IS_SUPPORTED) {
-		wipe_block_device(fd, info.len);
+		wipe_block_device(fd, info->len);
 	}
 
-	write_ext4_image(fd, gzip, sparse, crc);
+	write_ext4_image(ext4_sparse_file, fd, gzip, sparse, crc);
 
 	sparse_file_destroy(ext4_sparse_file);
 	ext4_sparse_file = NULL;

@@ -39,8 +39,6 @@
 #define SPARSE_HEADER_LEN       (sizeof(sparse_header_t))
 #define CHUNK_HEADER_LEN (sizeof(chunk_header_t))
 
-#define COPY_BUF_SIZE (1024U*1024U)
-static char *copybuf;
 
 #define min(a, b) \
 	({ typeof(a) _a = (a); typeof(b) _b = (b); (_a < _b) ? _a : _b; })
@@ -91,7 +89,7 @@ static void verbose_error(bool verbose, int err, const char *fmt, ...)
 
 static int process_raw_chunk(struct sparse_file *s, unsigned int chunk_size,
 		int fd, int64_t offset, unsigned int blocks, unsigned int block,
-		uint32_t *crc32)
+		uint32_t *crc32, char *copybuf, size_t copybuf_size)
 {
 	int ret;
 	int chunk;
@@ -112,7 +110,7 @@ static int process_raw_chunk(struct sparse_file *s, unsigned int chunk_size,
 
 	if (crc32) {
 		while (len) {
-			chunk = min(len, COPY_BUF_SIZE);
+			chunk = min(len, copybuf_size);
 			ret = read_all(fd, copybuf, chunk);
 			if (ret < 0) {
 				return ret;
@@ -128,11 +126,12 @@ static int process_raw_chunk(struct sparse_file *s, unsigned int chunk_size,
 }
 
 static int process_fill_chunk(struct sparse_file *s, unsigned int chunk_size,
-		int fd, unsigned int blocks, unsigned int block, uint32_t *crc32)
+		int fd, unsigned int blocks, unsigned int block, uint32_t *crc32,
+		char *copybuf, size_t copybuf_size)
 {
 	int ret;
 	int chunk;
-	int64_t len = (int64_t)blocks * s->block_size;
+	uint64_t len = blocks * s->block_size;
 	uint32_t fill_val;
 	uint32_t *fillbuf;
 	unsigned int i;
@@ -154,12 +153,12 @@ static int process_fill_chunk(struct sparse_file *s, unsigned int chunk_size,
 	if (crc32) {
 		/* Fill copy_buf with the fill value */
 		fillbuf = (uint32_t *)copybuf;
-		for (i = 0; i < (COPY_BUF_SIZE / sizeof(fill_val)); i++) {
+		for (i = 0; i < (copybuf_size / sizeof(fill_val)); i++) {
 			fillbuf[i] = fill_val;
 		}
 
 		while (len) {
-			chunk = min(len, COPY_BUF_SIZE);
+			chunk = min(len, copybuf_size);
 			*crc32 = sparse_crc32(*crc32, copybuf, chunk);
 			len -= chunk;
 		}
@@ -170,18 +169,19 @@ static int process_fill_chunk(struct sparse_file *s, unsigned int chunk_size,
 
 static int process_skip_chunk(struct sparse_file *s, unsigned int chunk_size,
 		int fd __unused, unsigned int blocks,
-		unsigned int block __unused, uint32_t *crc32)
+		unsigned int block __unused, uint32_t *crc32,
+		char *copybuf, size_t copybuf_size)
 {
 	if (chunk_size != 0) {
 		return -EINVAL;
 	}
 
 	if (crc32) {
-	        int64_t len = (int64_t)blocks * s->block_size;
-		memset(copybuf, 0, COPY_BUF_SIZE);
+	        uint64_t len = blocks * s->block_size;
+		memset(copybuf, 0, copybuf_size);
 
 		while (len) {
-			int chunk = min(len, COPY_BUF_SIZE);
+			uint64_t chunk = min(len, copybuf_size);
 			*crc32 = sparse_crc32(*crc32, copybuf, chunk);
 			len -= chunk;
 		}
@@ -213,7 +213,8 @@ static int process_crc32_chunk(int fd, unsigned int chunk_size, uint32_t crc32)
 
 static int process_chunk(struct sparse_file *s, int fd, off_t offset,
 		unsigned int chunk_hdr_sz, chunk_header_t *chunk_header,
-		unsigned int cur_block, uint32_t *crc_ptr)
+		unsigned int cur_block, uint32_t *crc_ptr, char *copybuf,
+		size_t copybuf_size)
 {
 	int ret;
 	unsigned int chunk_data_size;
@@ -223,7 +224,8 @@ static int process_chunk(struct sparse_file *s, int fd, off_t offset,
 	switch (chunk_header->chunk_type) {
 		case CHUNK_TYPE_RAW:
 			ret = process_raw_chunk(s, chunk_data_size, fd, offset,
-					chunk_header->chunk_sz, cur_block, crc_ptr);
+					chunk_header->chunk_sz, cur_block,
+					crc_ptr, copybuf, copybuf_size);
 			if (ret < 0) {
 				verbose_error(s->verbose, ret, "data block at %lld", offset);
 				return ret;
@@ -231,7 +233,8 @@ static int process_chunk(struct sparse_file *s, int fd, off_t offset,
 			return chunk_header->chunk_sz;
 		case CHUNK_TYPE_FILL:
 			ret = process_fill_chunk(s, chunk_data_size, fd,
-					chunk_header->chunk_sz, cur_block, crc_ptr);
+					chunk_header->chunk_sz, cur_block,crc_ptr,
+					copybuf, copybuf_size);
 			if (ret < 0) {
 				verbose_error(s->verbose, ret, "fill block at %lld", offset);
 				return ret;
@@ -239,7 +242,8 @@ static int process_chunk(struct sparse_file *s, int fd, off_t offset,
 			return chunk_header->chunk_sz;
 		case CHUNK_TYPE_DONT_CARE:
 			ret = process_skip_chunk(s, chunk_data_size, fd,
-					chunk_header->chunk_sz, cur_block, crc_ptr);
+					chunk_header->chunk_sz, cur_block, crc_ptr,
+					copybuf, copybuf_size);
 			if (chunk_data_size != 0) {
 				if (ret < 0) {
 					verbose_error(s->verbose, ret, "skip block at %lld", offset);
@@ -263,7 +267,8 @@ static int process_chunk(struct sparse_file *s, int fd, off_t offset,
 	return 0;
 }
 
-static int sparse_file_read_sparse(struct sparse_file *s, int fd, bool crc)
+static int sparse_file_read_sparse(struct sparse_file *s, int fd, bool crc,
+				   char *copybuf, size_t copybuf_size)
 {
 	int ret;
 	unsigned int i;
@@ -273,14 +278,18 @@ static int sparse_file_read_sparse(struct sparse_file *s, int fd, bool crc)
 	uint32_t *crc_ptr = 0;
 	unsigned int cur_block = 0;
 	off_t offset;
+	int error = 0;
+	int copybuf_needs_free = 0;
 
 	if (!copybuf) {
-		copybuf = malloc(COPY_BUF_SIZE);
+		copybuf = malloc(copybuf_size);
+		if (!copybuf) {
+			error = -ENOMEM;
+			goto sparse_file_read_sparse_end;
+		}
+		copybuf_needs_free = 1;
 	}
 
-	if (!copybuf) {
-		return -ENOMEM;
-	}
 
 	if (crc) {
 		crc_ptr = &crc32;
@@ -288,23 +297,28 @@ static int sparse_file_read_sparse(struct sparse_file *s, int fd, bool crc)
 
 	ret = read_all(fd, &sparse_header, sizeof(sparse_header));
 	if (ret < 0) {
-		return ret;
+		error = ret;
+		goto sparse_file_read_sparse_end;
 	}
 
 	if (sparse_header.magic != SPARSE_HEADER_MAGIC) {
-		return -EINVAL;
+		error = -EINVAL;
+		goto sparse_file_read_sparse_end;
 	}
 
 	if (sparse_header.major_version != SPARSE_HEADER_MAJOR_VER) {
-		return -EINVAL;
+		error = -EINVAL;
+		goto sparse_file_read_sparse_end;
 	}
 
 	if (sparse_header.file_hdr_sz < SPARSE_HEADER_LEN) {
-		return -EINVAL;
+		error = -EINVAL;
+		goto sparse_file_read_sparse_end;
 	}
 
 	if (sparse_header.chunk_hdr_sz < sizeof(chunk_header)) {
-		return -EINVAL;
+		error = -EINVAL;
+		goto sparse_file_read_sparse_end;
 	}
 
 	if (sparse_header.file_hdr_sz > SPARSE_HEADER_LEN) {
@@ -317,7 +331,8 @@ static int sparse_file_read_sparse(struct sparse_file *s, int fd, bool crc)
 	for (i = 0; i < sparse_header.total_chunks; i++) {
 		ret = read_all(fd, &chunk_header, sizeof(chunk_header));
 		if (ret < 0) {
-			return ret;
+			error = ret;
+			goto sparse_file_read_sparse_end;
 		}
 
 		if (sparse_header.chunk_hdr_sz > CHUNK_HEADER_LEN) {
@@ -329,35 +344,50 @@ static int sparse_file_read_sparse(struct sparse_file *s, int fd, bool crc)
 
 		offset = lseek(fd, 0, SEEK_CUR);
 
-		ret = process_chunk(s, fd, offset, sparse_header.chunk_hdr_sz, &chunk_header,
-				cur_block, crc_ptr);
+		ret = process_chunk(s, fd, offset, sparse_header.chunk_hdr_sz,
+				    &chunk_header, cur_block, crc_ptr, copybuf,
+				    copybuf_size);
 		if (ret < 0) {
-			return ret;
+			error = ret;
+			goto sparse_file_read_sparse_end;
 		}
 
 		cur_block += ret;
 	}
 
 	if (sparse_header.total_blks != cur_block) {
-		return -EINVAL;
+		error = -EINVAL;
 	}
 
-	return 0;
+sparse_file_read_sparse_end:
+	if (copybuf_needs_free) {
+		free(copybuf);
+	}
+	return error;
 }
 
-static int sparse_file_read_normal(struct sparse_file *s, int fd)
+static int sparse_file_read_normal(struct sparse_file *s, int fd, char *copybuf,
+				   size_t copybuf_size)
 {
 	int ret;
-	uint32_t *buf = malloc(s->block_size);
+	uint32_t *buf = NULL;
 	unsigned int block = 0;
 	int64_t remain = s->len;
 	int64_t offset = 0;
 	unsigned int to_read;
 	unsigned int i;
+	int error = 0;
 	bool sparse_block;
+	int buf_needs_free = 0;
 
-	if (!buf) {
-		return -ENOMEM;
+	if (copybuf && (copybuf_size >= s->block_size)) {
+		buf = (uint32_t *)copybuf;
+	} else {
+		buf = malloc(s->block_size);
+		if (!buf) {
+			return -ENOMEM;
+		}
+		buf_needs_free = 1;
 	}
 
 	while (remain > 0) {
@@ -365,7 +395,8 @@ static int sparse_file_read_normal(struct sparse_file *s, int fd)
 		ret = read_all(fd, buf, to_read);
 		if (ret < 0) {
 			error("failed to read sparse file");
-			return ret;
+			error = ret;
+			goto sparse_file_read_normal_end;
 		}
 
 		if (to_read == s->block_size) {
@@ -392,23 +423,30 @@ static int sparse_file_read_normal(struct sparse_file *s, int fd)
 		block++;
 	}
 
-	return 0;
+sparse_file_read_normal_end:
+	if (buf_needs_free) {
+		free(buf);
+	}
+
+	return error;
 }
 
-int sparse_file_read(struct sparse_file *s, int fd, bool sparse, bool crc)
+int sparse_file_read(struct sparse_file *s, int fd, bool sparse, bool crc,
+		     char *copybuf, size_t copybuf_size)
 {
 	if (crc && !sparse) {
 		return -EINVAL;
 	}
 
 	if (sparse) {
-		return sparse_file_read_sparse(s, fd, crc);
+		return sparse_file_read_sparse(s, fd, crc, copybuf, copybuf_size);
 	} else {
-		return sparse_file_read_normal(s, fd);
+		return sparse_file_read_normal(s, fd, copybuf, copybuf_size);
 	}
 }
 
-struct sparse_file *sparse_file_import(int fd, bool verbose, bool crc)
+struct sparse_file *sparse_file_import(int fd, bool verbose, bool crc,
+				       char *copybuf, size_t copybuf_size)
 {
 	int ret;
 	sparse_header_t sparse_header;
@@ -455,7 +493,7 @@ struct sparse_file *sparse_file_import(int fd, bool verbose, bool crc)
 
 	s->verbose = verbose;
 
-	ret = sparse_file_read(s, fd, true, crc);
+	ret = sparse_file_read(s, fd, true, crc, copybuf, copybuf_size);
 	if (ret < 0) {
 		sparse_file_destroy(s);
 		return NULL;
@@ -464,13 +502,14 @@ struct sparse_file *sparse_file_import(int fd, bool verbose, bool crc)
 	return s;
 }
 
-struct sparse_file *sparse_file_import_auto(int fd, bool crc, bool verbose)
+struct sparse_file *sparse_file_import_auto(int fd, bool crc, bool verbose,
+					    char *copybuf, size_t copybuf_size)
 {
 	struct sparse_file *s;
 	int64_t len;
 	int ret;
 
-	s = sparse_file_import(fd, verbose, crc);
+	s = sparse_file_import(fd, verbose, crc, copybuf, copybuf_size);
 	if (s) {
 		return s;
 	}
@@ -487,7 +526,7 @@ struct sparse_file *sparse_file_import_auto(int fd, bool crc, bool verbose)
 		return NULL;
 	}
 
-	ret = sparse_file_read_normal(s, fd);
+	ret = sparse_file_read_normal(s, fd, copybuf, copybuf_size);
 	if (ret < 0) {
 		sparse_file_destroy(s);
 		return NULL;
