@@ -74,12 +74,14 @@ u16 get_directories(struct fs_aux_info *aux_info, int bg);
 u16 get_bg_flags(struct fs_aux_info *aux_info, int bg);
 u32 allocate_inode(struct fs_info *info, struct fs_aux_info *aux_info);
 void free_alloc(struct block_allocation *alloc);
-int reserve_oob_blocks(struct block_allocation *alloc, int blocks);
+int reserve_oob_blocks(struct block_allocation *alloc, jmp_buf *setjmp_env,
+		       int blocks);
 int advance_blocks(struct block_allocation *alloc, int blocks);
 int advance_oob_blocks(struct block_allocation *alloc, int blocks);
 int last_region(struct block_allocation *alloc);
 void rewind_alloc(struct block_allocation *alloc);
-void append_region(struct block_allocation *alloc, u32 block, u32 len, int bg);
+void append_region(struct block_allocation *alloc, jmp_buf *setjmp_env,
+		   u32 block, u32 len, int bg);
 struct block_allocation *create_allocation(jmp_buf *setjmp_env);
 int append_oob_allocation(struct fs_aux_info *aux_info, int force,
 			  jmp_buf *setjmp_env, struct block_allocation *alloc,

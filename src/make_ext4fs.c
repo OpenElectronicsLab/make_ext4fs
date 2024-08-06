@@ -141,7 +141,8 @@ static u32 build_directory_structure(struct fs_info *info,
 
 	dentries = calloc(entries, sizeof(struct dentry));
 	if (dentries == NULL)
-		critical_error_errno(setjmp_env, "malloc");
+		critical_error_errno(setjmp_env, "calloc(%zu, %zu)",
+				     (size_t)entries, sizeof(struct dentry));
 
 	for (i = 0; i < entries; i++) {
 		dentries[i].filename = strdup(namelist[i]->d_name);
@@ -203,6 +204,10 @@ static u32 build_directory_structure(struct fs_info *info,
 		} else if (S_ISLNK(stat.st_mode)) {
 			dentries[i].file_type = EXT4_FT_SYMLINK;
 			dentries[i].link = calloc(info->block_size, 1);
+			if (!dentries[i].link) {
+				critical_error(setjmp_env, "calloc(%zu, 1)",
+					       (size_t)info->block_size);
+			}
 			readlink(dentries[i].full_path, dentries[i].link,
 				 info->block_size - 1);
 		} else {
@@ -217,6 +222,11 @@ static u32 build_directory_structure(struct fs_info *info,
 	if (needs_lost_and_found) {
 		/* insert a lost+found directory at the beginning of the dentries */
 		struct dentry *tmp = calloc(entries + 1, sizeof(struct dentry));
+		if (!tmp) {
+			critical_error(setjmp_env, "calloc(%zu, %zu)",
+				       (size_t)entries + 1,
+				       sizeof(struct dentry));
+		}
 		memset(tmp, 0, sizeof(struct dentry));
 		memcpy(tmp + 1, dentries, entries * sizeof(struct dentry));
 		dentries = tmp;
@@ -404,7 +414,7 @@ static char *canonicalize_slashes(jmp_buf *setjmp_env, const char *str,
 	}
 	ret = malloc(newlen + 1);
 	if (!ret) {
-		critical_error(setjmp_env, "malloc");
+		critical_error(setjmp_env, "malloc(%zu)", (size_t)newlen + 1);
 	}
 
 	ptr = ret;
@@ -534,7 +544,7 @@ int make_ext4fs_internal(struct fs_info *info, struct fs_aux_info *aux_info,
 	block_allocator_init(info, aux_info, ext4_sparse_file, force,
 			     setjmp_env);
 
-	ext4_fill_in_sb(info, aux_info, ext4_sparse_file);
+	ext4_fill_in_sb(info, aux_info, ext4_sparse_file, setjmp_env);
 
 	if (reserve_inodes(aux_info, 0, 10) == EXT4_ALLOCATE_FAILED)
 		error(force, setjmp_env, "failed to reserve first 10 inodes");
@@ -571,7 +581,7 @@ int make_ext4fs_internal(struct fs_info *info, struct fs_aux_info *aux_info,
 
 	ext4_update_free(aux_info);
 
-	ext4_queue_sb(info, aux_info, ext4_sparse_file);
+	ext4_queue_sb(info, aux_info, ext4_sparse_file, setjmp_env);
 
 	if (block_list_file) {
 		size_t dirlen = strlen(directory);

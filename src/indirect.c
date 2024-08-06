@@ -38,7 +38,7 @@ static u8 *create_backing(struct fs_info *info,
 
 	u8 *data = calloc(backing_len, 1);
 	if (!data)
-		critical_error_errno(setjmp_env, "calloc");
+		critical_error_errno(setjmp_env, "calloc(%zu, 1)", backing_len);
 
 	u8 *ptr = data;
 	for (; alloc != NULL && backing_len > 0; get_next_region(alloc)) {
@@ -60,7 +60,7 @@ static u8 *create_backing(struct fs_info *info,
 static void reserve_indirect_block(int force, jmp_buf *setjmp_env,
 				   struct block_allocation *alloc, int len)
 {
-	if (reserve_oob_blocks(alloc, 1)) {
+	if (reserve_oob_blocks(alloc, setjmp_env, 1)) {
 		error(force, setjmp_env, "failed to reserve oob block");
 		return;
 	}
@@ -75,7 +75,7 @@ static void reserve_dindirect_block(struct fs_aux_info *aux_info, int force,
 				    jmp_buf *setjmp_env,
 				    struct block_allocation *alloc, int len)
 {
-	if (reserve_oob_blocks(alloc, 1)) {
+	if (reserve_oob_blocks(alloc, setjmp_env, 1)) {
 		error(force, setjmp_env, "failed to reserve oob block");
 		return;
 	}
@@ -94,7 +94,7 @@ static void reserve_tindirect_block(struct fs_aux_info *aux_info, int force,
 				    jmp_buf *setjmp_env,
 				    struct block_allocation *alloc, int len)
 {
-	if (reserve_oob_blocks(alloc, 1)) {
+	if (reserve_oob_blocks(alloc, setjmp_env, 1)) {
 		error(force, setjmp_env, "failed to reserve oob block");
 		return;
 	}
@@ -138,6 +138,10 @@ static void fill_dindirect_block(struct fs_info *info,
 		dind_block[i] = ind_block;
 
 		u32 *ind_block_data = calloc(info->block_size, 1);
+		if (!ind_block_data) {
+			critical_error_errno(setjmp_env, "calloc(%zu,1)",
+					     (size_t)info->block_size);
+		}
 		sparse_file_add_data(ext4_sparse_file, ind_block_data,
 				     info->block_size, ind_block);
 		int ind_block_len = min((int)aux_info->blocks_per_ind, len);
@@ -174,6 +178,10 @@ static void fill_tindirect_block(struct fs_info *info,
 		tind_block[i] = dind_block;
 
 		u32 *dind_block_data = calloc(info->block_size, 1);
+		if (!dind_block_data) {
+			critical_error_errno(setjmp_env, "calloc(%zu, 1)",
+					     (size_t)info->block_size);
+		}
 		sparse_file_add_data(ext4_sparse_file, dind_block_data,
 				     info->block_size, dind_block);
 		int dind_block_len = min((int)aux_info->blocks_per_dind, len);
@@ -232,6 +240,10 @@ static int inode_attach_indirect_blocks(struct fs_info *info,
 	}
 
 	u32 *ind_block_data = calloc(info->block_size, 1);
+	if (!ind_block_data) {
+		critical_error_errno(setjmp_env, "calloc(%zu, 1)",
+				     (size_t)info->block_size);
+	}
 	sparse_file_add_data(ext4_sparse_file, ind_block_data, info->block_size,
 			     ind_block);
 
@@ -269,6 +281,10 @@ static int inode_attach_dindirect_blocks(struct fs_info *info,
 	}
 
 	u32 *dind_block_data = calloc(info->block_size, 1);
+	if (!dind_block_data) {
+		critical_error_errno(setjmp_env, "calloc(%zu, 1)",
+				     (size_t)info->block_size);
+	}
 	sparse_file_add_data(ext4_sparse_file, dind_block_data,
 			     info->block_size, dind_block);
 
@@ -307,6 +323,10 @@ static int inode_attach_tindirect_blocks(struct fs_info *info,
 	}
 
 	u32 *tind_block_data = calloc(info->block_size, 1);
+	if (!tind_block_data) {
+		critical_error_errno(setjmp_env, "calloc(%zu, 1)",
+				     (size_t)info->block_size);
+	}
 	sparse_file_add_data(ext4_sparse_file, tind_block_data,
 			     info->block_size, tind_block);
 
@@ -531,14 +551,17 @@ void inode_attach_resize(struct fs_info *info, struct fs_aux_info *aux_info,
 
 	u32 *dind_block_data = calloc(info->block_size, 1);
 	if (!dind_block_data)
-		critical_error_errno(setjmp_env, "calloc");
+		critical_error_errno(setjmp_env, "calloc(%zu, 1)",
+				     (size_t)info->block_size);
 	sparse_file_add_data(ext4_sparse_file, dind_block_data,
 			     info->block_size, dind_block);
 
 	u32 *ind_block_data =
 	    calloc(info->block_size, info->bg_desc_reserve_blocks);
 	if (!ind_block_data)
-		critical_error_errno(setjmp_env, "calloc");
+		critical_error_errno(setjmp_env, "calloc(%zu, %zu)",
+				     (size_t)info->block_size,
+				     (size_t)info->bg_desc_reserve_blocks);
 	sparse_file_add_data(ext4_sparse_file, ind_block_data,
 			     info->block_size * info->bg_desc_reserve_blocks,
 			     get_block(alloc, 0));

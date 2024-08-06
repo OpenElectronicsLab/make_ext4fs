@@ -1,13 +1,19 @@
 2024-08-06  Eric Herman  <eric@freesa.org>
 
-	Guard against some malloc failures
+	Guard against some malloc()/calloc() failures
 	Add a "make tidy" target based upon Linux kernel coding
 	https://github.com/torvalds/linux/blob/master/scripts/Lindent
 
 	* Makefile: add "tidy" target using "Lindent"
 	* misc/workaround-indent-bug-65165.patch: add indent patch
-	* src/allocate.c: critical error if malloc() returns NULL
-	* src/allocate.h
+	* src/allocate.c: error if malloc() returns NULL
+	* src/allocate.h: add jmp_buf to functions
+	* src/ext4_utils.c: error if malloc() returns NULL
+	* src/ext4_utils.h: add jmp_buf to functions
+	* src/extent.c: error if malloc() returns NULL
+	* src/indirect.c: error if malloc() returns NULL
+	* src/make_ext4fs.c: error if malloc() returns NULL
+	* src/libsparse/backed_block.c: early return NULL, if malloc() fails
 	* src/canned_fs_config.c
 	* src/canned_fs_config.h
 	* src/contents.c
@@ -16,15 +22,10 @@
 	* src/ext4_extents.h
 	* src/ext4_sb.c
 	* src/ext4_sb.h
-	* src/ext4_utils.c
-	* src/ext4_utils.h
 	* src/ext4fixup.c
-	* src/extent.c
 	* src/extent.h
 	* src/include/private/android_filesystem_capability.h
-	* src/indirect.c
 	* src/jbd2.h
-	* src/libsparse/backed_block.c
 	* src/libsparse/backed_block.h
 	* src/libsparse/include/sparse/sparse.h
 	* src/libsparse/output_file.c
@@ -35,7 +36,6 @@
 	* src/libsparse/sparse_file.h
 	* src/libsparse/sparse_format.h
 	* src/libsparse/sparse_read.c
-	* src/make_ext4fs.c
 	* src/make_ext4fs_main.c
 	* src/sha1.c
 	* src/sha1.h
