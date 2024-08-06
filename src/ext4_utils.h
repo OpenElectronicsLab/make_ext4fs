@@ -161,7 +161,7 @@ void ext4_init_fs_aux_info(struct fs_info *info, struct fs_aux_info *aux_info,
 			   jmp_buf *setjmp_env);
 void ext4_free_fs_aux_info(struct fs_aux_info *aux_info);
 void ext4_fill_in_sb(struct fs_info *info, struct fs_aux_info *aux_info,
-		     struct sparse_file *ext4_sparse_file);
+		     struct sparse_file *ext4_sparse_file, jmp_buf *setjmp_env);
 void ext4_create_resize_inode(struct fs_info *info,
 			      struct fs_aux_info *aux_info,
 			      struct sparse_file *ext4_sparse_file,
@@ -172,7 +172,7 @@ void ext4_create_journal_inode(struct fs_info *info,
 			       int force, jmp_buf *setjmp_env);
 void ext4_update_free(struct fs_aux_info *aux_info);
 void ext4_queue_sb(struct fs_info *info, struct fs_aux_info *aux_info,
-		   struct sparse_file *ext4_sparse_file);
+		   struct sparse_file *ext4_sparse_file, jmp_buf *setjmp_env);
 u64 get_block_device_size(int fd);
 int is_block_device_fd(int fd);
 u64 get_file_size(struct fs_info *info, int fd);

@@ -169,11 +169,15 @@ void print_blocks(FILE *f, struct block_allocation *alloc)
 	fputc('\n', f);
 }
 
-void append_region(struct block_allocation *alloc,
+void append_region(struct block_allocation *alloc, jmp_buf *setjmp_env,
 		   u32 block, u32 len, int bg_num)
 {
+	size_t size = sizeof(struct region);
 	struct region *reg;
-	reg = malloc(sizeof(struct region));
+	reg = malloc(size);
+	if (!reg) {
+		critical_error_errno(setjmp_env, "malloc(%zu)", size);
+	}
 	reg->block = block;
 	reg->len = len;
 	reg->bg = bg_num;
@@ -200,7 +204,9 @@ static void allocate_bg_inode_table(struct fs_info *info,
 	bg->inode_table =
 	    calloc(aux_info->inode_table_blocks, info->block_size);
 	if (bg->inode_table == NULL)
-		critical_error_errno(setjmp_env, "calloc");
+		critical_error_errno(setjmp_env, "calloc(%zu, %zu)",
+				     (size_t)aux_info->inode_table_blocks,
+				     (size_t)info->block_size);
 
 	sparse_file_add_data(ext4_sparse_file, bg->inode_table,
 			     aux_info->inode_table_blocks * info->block_size,
@@ -322,6 +328,10 @@ static void init_bg(struct fs_info *info, struct fs_aux_info *aux_info,
 		    1 + aux_info->bg_desc_blocks + info->bg_desc_reserve_blocks;
 
 	bg->bitmaps = calloc(info->block_size, 2);
+	if (!bg->bitmaps) {
+		critical_error_errno(setjmp_env, "calloc(%zu, 2)",
+				     (size_t)info->block_size);
+	}
 	bg->block_bitmap = bg->bitmaps;
 	bg->inode_bitmap = bg->bitmaps + info->block_size;
 
@@ -367,7 +377,9 @@ void block_allocator_init(struct fs_info *info, struct fs_aux_info *aux_info,
 	aux_info->bgs =
 	    calloc(sizeof(struct block_group_info), aux_info->groups);
 	if (aux_info->bgs == NULL)
-		critical_error_errno(setjmp_env, "calloc");
+		critical_error_errno(setjmp_env, "calloc(%zu, %zu)",
+				     sizeof(struct block_group_info),
+				     (size_t)aux_info->groups);
 
 	for (i = 0; i < aux_info->groups; i++)
 		init_bg(info, aux_info, ext4_sparse_file, force, setjmp_env, i);
@@ -457,6 +469,10 @@ static struct region *ext4_allocate_best_fit_partial(struct fs_aux_info
 			return NULL;
 		}
 		reg = malloc(sizeof(struct region));
+		if (!reg) {
+			critical_error_errno(setjmp_env, "malloc(%zu)",
+					     sizeof(struct region));
+		}
 		reg->block = block;
 		reg->len = allocate_len;
 		reg->next = NULL;
@@ -608,7 +624,7 @@ void rewind_alloc(struct block_allocation *alloc)
 }
 
 static struct region *do_split_allocation(struct block_allocation *alloc,
-					  u32 len)
+					  jmp_buf *setjmp_env, u32 len)
 {
 	struct region *reg = alloc->list.iter;
 	struct region *new;
@@ -624,6 +640,10 @@ static struct region *do_split_allocation(struct block_allocation *alloc,
 
 	if (len > 0) {
 		new = malloc(sizeof(struct region));
+		if (!new) {
+			critical_error_errno(setjmp_env, "malloc(%zu)",
+					     sizeof(struct region));
+		}
 
 		new->bg = reg->bg;
 		new->block = reg->block + len;
@@ -645,21 +665,23 @@ static struct region *do_split_allocation(struct block_allocation *alloc,
 /* Splits an allocation into two allocations.  The returned allocation will
    point to the first half, and the original allocation ptr will point to the
    second half. */
-static struct region *split_allocation(struct block_allocation *alloc, u32 len)
+static struct region *split_allocation(struct block_allocation *alloc,
+				       jmp_buf *setjmp_env, u32 len)
 {
 	/* First make sure there is a split at the current ptr */
-	do_split_allocation(alloc, alloc->list.partial_iter);
+	do_split_allocation(alloc, setjmp_env, alloc->list.partial_iter);
 
 	/* Then split off len blocks */
-	struct region *middle = do_split_allocation(alloc, len);
+	struct region *middle = do_split_allocation(alloc, setjmp_env, len);
 	alloc->list.partial_iter = 0;
 	return middle;
 }
 
 /* Reserve the next blocks for oob data (indirect or extent blocks) */
-int reserve_oob_blocks(struct block_allocation *alloc, int blocks)
+int reserve_oob_blocks(struct block_allocation *alloc, jmp_buf *setjmp_env,
+		       int blocks)
 {
-	struct region *oob = split_allocation(alloc, blocks);
+	struct region *oob = split_allocation(alloc, setjmp_env, blocks);
 	struct region *next;
 
 	if (oob == NULL)

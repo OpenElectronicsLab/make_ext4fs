@@ -33,7 +33,7 @@ static u8 *extent_create_backing(struct fs_info *info,
 {
 	u8 *data = calloc(backing_len, 1);
 	if (!data)
-		critical_error_errno(setjmp_env, "calloc");
+		critical_error_errno(setjmp_env, "calloc(%zu, 1)", backing_len);
 
 	u8 *ptr = data;
 	for (; alloc != NULL && backing_len > 0; get_next_region(alloc)) {
@@ -102,7 +102,7 @@ static struct block_allocation *do_inode_allocate_extents(struct fs_info *info, 
 	if (allocation_len <= 3) {
 		reduce_allocation(aux_info, alloc, 1);
 	} else {
-		reserve_oob_blocks(alloc, 1);
+		reserve_oob_blocks(alloc, setjmp_env, 1);
 		extent_block = get_oob_block(alloc, 0);
 	}
 
@@ -134,7 +134,8 @@ static struct block_allocation *do_inode_allocate_extents(struct fs_info *info, 
 
 		u8 *data = calloc(info->block_size, 1);
 		if (!data)
-			critical_error_errno(setjmp_env, "calloc");
+			critical_error_errno(setjmp_env, "calloc(%zu, 1)",
+					     (size_t)info->block_size);
 
 		sparse_file_add_data(ext4_sparse_file, data, info->block_size,
 				     extent_block);

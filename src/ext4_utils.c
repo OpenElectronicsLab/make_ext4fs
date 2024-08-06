@@ -162,15 +162,24 @@ void ext4_init_fs_aux_info(struct fs_info *info, struct fs_aux_info *aux_info,
 	}
 
 	aux_info->sb = calloc(info->block_size, 1);
+	if (!aux_info->sb) {
+		critical_error_errno(setjmp_env, "calloc(%zu, 1)",
+				     (size_t)info->block_size);
+	}
+
 	/* Alloc an array to hold the pointers to the backup superblocks */
 	aux_info->backup_sb = calloc(aux_info->groups, sizeof(char *));
-
-	if (!aux_info->sb)
-		critical_error_errno(setjmp_env, "calloc");
+	if (!aux_info->backup_sb) {
+		critical_error_errno(setjmp_env, "calloc(%zu, %zu)",
+				     (size_t)aux_info->groups, sizeof(char *));
+	}
 
 	aux_info->bg_desc = calloc(info->block_size, aux_info->bg_desc_blocks);
-	if (!aux_info->bg_desc)
-		critical_error_errno(setjmp_env, "calloc");
+	if (!aux_info->bg_desc) {
+		critical_error_errno(setjmp_env, "calloc(%zu, %zu)",
+				     (size_t)info->block_size,
+				     (size_t)aux_info->bg_desc_blocks);
+	}
 	aux_info->xattrs = NULL;
 }
 
@@ -188,7 +197,7 @@ void ext4_free_fs_aux_info(struct fs_aux_info *aux_info)
 
 /* Fill in the superblock memory buffer based on the filesystem parameters */
 void ext4_fill_in_sb(struct fs_info *info, struct fs_aux_info *aux_info,
-		     struct sparse_file *ext4_sparse_file)
+		     struct sparse_file *ext4_sparse_file, jmp_buf *setjmp_env)
 {
 	unsigned int i;
 	struct ext4_super_block *sb = aux_info->sb;
@@ -273,6 +282,12 @@ void ext4_fill_in_sb(struct fs_info *info, struct fs_aux_info *aux_info,
 			if (i != 0) {
 				aux_info->backup_sb[i] =
 				    calloc(info->block_size, 1);
+				if (!aux_info->backup_sb[i]) {
+					critical_error_errno(setjmp_env,
+							     "calloc(%zu, 1)",
+							     (size_t)
+							     info->block_size);
+				}
 				memcpy(aux_info->backup_sb[i], sb,
 				       info->block_size);
 				/* Update the block group nr of this backup superblock */
@@ -308,7 +323,7 @@ void ext4_fill_in_sb(struct fs_info *info, struct fs_aux_info *aux_info,
 }
 
 void ext4_queue_sb(struct fs_info *info, struct fs_aux_info *aux_info,
-		   struct sparse_file *ext4_sparse_file)
+		   struct sparse_file *ext4_sparse_file, jmp_buf *setjmp_env)
 {
 	/* The write_data* functions expect only block aligned calls.
 	 * This is not an issue, except when we write out the super
@@ -317,6 +332,10 @@ void ext4_queue_sb(struct fs_info *info, struct fs_aux_info *aux_info,
 	 */
 	if (info->block_size > 1024) {
 		u8 *buf = calloc(info->block_size, 1);
+		if (!buf) {
+			critical_error_errno(setjmp_env, "calloc(%zu, 1)",
+					     (size_t)info->block_size);
+		}
 		memcpy(buf + 1024, (u8 *)aux_info->sb, 1024);
 		sparse_file_add_data(ext4_sparse_file, buf, info->block_size,
 				     0);
@@ -369,8 +388,9 @@ void ext4_create_resize_inode(struct fs_info *info,
 			u32 reserved_block_start = group_start_block + 1 +
 			    aux_info->bg_desc_blocks;
 			u32 reserved_block_len = info->bg_desc_reserve_blocks;
-			append_region(reserve_inode_alloc, reserved_block_start,
-				      reserved_block_len, i);
+			append_region(reserve_inode_alloc, setjmp_env,
+				      reserved_block_start, reserved_block_len,
+				      i);
 			reserve_inode_len += reserved_block_len;
 		}
 	}
