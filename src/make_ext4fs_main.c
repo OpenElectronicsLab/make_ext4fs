@@ -32,11 +32,17 @@
 
 static void usage(char *path)
 {
-	fprintf(stderr, "%s [ -l <len> ] [ -j <journal size> ] [ -b <block_size> ]\n", basename(path));
-	fprintf(stderr, "    [ -g <blocks per group> ] [ -i <inodes> ] [ -I <inode size> ]\n");
-	fprintf(stderr, "    [ -m <reserved blocks percent> ] [ -L <label> ] [ -u <uuid>] [ -f ]\n");
-	fprintf(stderr, "    [ -S file_contexts ] [ -C fs_config ] [ -T timestamp ]\n");
-	fprintf(stderr, "    [ -z | -s ] [ -w ] [ -c ] [ -J ] [ -v ] [ -B <block_list_file> ]\n");
+	fprintf(stderr,
+		"%s [ -l <len> ] [ -j <journal size> ] [ -b <block_size> ]\n",
+		basename(path));
+	fprintf(stderr,
+		"    [ -g <blocks per group> ] [ -i <inodes> ] [ -I <inode size> ]\n");
+	fprintf(stderr,
+		"    [ -m <reserved blocks percent> ] [ -L <label> ] [ -u <uuid>] [ -f ]\n");
+	fprintf(stderr,
+		"    [ -S file_contexts ] [ -C fs_config ] [ -T timestamp ]\n");
+	fprintf(stderr,
+		"    [ -z | -s ] [ -w ] [ -c ] [ -J ] [ -v ] [ -B <block_list_file> ]\n");
 	fprintf(stderr, "    <filename> [<directory>]\n");
 }
 
@@ -55,7 +61,7 @@ int main(int argc, char **argv)
 	int exitcode;
 	int verbose = 0;
 	time_t fixed_time = -1;
-	FILE* block_list_file = NULL;
+	FILE *block_list_file = NULL;
 	struct fs_config_list config_list;
 	int uuid_user_specified = 0;
 	int force = 0;
@@ -72,7 +78,8 @@ int main(int argc, char **argv)
 	memset(&ext4_sparse_file, 0x00, sizeof(struct sparse_file));
 	memset(&saved_allocation_head, 0x00, sizeof(struct block_allocation));
 
-	while ((opt = getopt(argc, argv, "l:j:b:g:i:I:L:u:T:C:B:m:fwzJsctv")) != -1) {
+	while ((opt =
+		getopt(argc, argv, "l:j:b:g:i:I:L:u:T:C:B:m:fwzJsctv")) != -1) {
 		switch (opt) {
 		case 'l':
 			info.len = parse_num(optarg);
@@ -122,7 +129,8 @@ int main(int argc, char **argv)
 			sparse = 1;
 			break;
 		case 't':
-			fprintf(stderr, "Warning: -t (initialize inode tables) is deprecated\n");
+			fprintf(stderr,
+				"Warning: -t (initialize inode tables) is deprecated\n");
 			break;
 		case 'v':
 			verbose = 1;
@@ -136,14 +144,16 @@ int main(int argc, char **argv)
 		case 'B':
 			block_list_file = fopen(optarg, "w");
 			if (block_list_file == NULL) {
-				fprintf(stderr, "failed to open block_list_file: %s\n", strerror(errno));
+				fprintf(stderr,
+					"failed to open block_list_file: %s\n",
+					strerror(errno));
 				exit(EXIT_FAILURE);
 			}
 			break;
 		case 'm':
 			info.reserve_pcnt = strtoul(optarg, NULL, 0);
 			break;
-		default: /* '?' */
+		default:	/* '?' */
 			usage(argv[0]);
 			exit(EXIT_FAILURE);
 		}

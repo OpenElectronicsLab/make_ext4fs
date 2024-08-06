@@ -26,9 +26,9 @@ extern "C" {
 #endif
 
 struct fs_info {
-	int64_t len;	/* If set to 0, ask the block device for the size,
-			 * if less than 0, reserve that much space at the
-			 * end of the partition, else use the size given. */
+	int64_t len;		/* If set to 0, ask the block device for the size,
+				 * if less than 0, reserve that much space at the
+				 * end of the partition, else use the size given. */
 	uint32_t block_size;
 	uint32_t blocks_per_group;
 	uint32_t inodes_per_group;

@@ -29,7 +29,8 @@
 #include "extent.h"
 #include "indirect.h"
 
-static u32 dentry_size(struct fs_info *info, u32 entries, struct dentry *dentries)
+static u32 dentry_size(struct fs_info *info, u32 entries,
+		       struct dentry *dentries)
 {
 	u32 len = 24;
 	unsigned int i;
@@ -98,7 +99,9 @@ u32 make_directory(struct fs_info *info, struct fs_aux_info *aux_info,
 	unsigned int i;
 	struct ext4_dir_entry_2 *dentry;
 
-	blocks = DIV_ROUND_UP(dentry_size(info, entries, dentries), info->block_size);
+	blocks =
+	    DIV_ROUND_UP(dentry_size(info, entries, dentries),
+			 info->block_size);
 	len = blocks * info->block_size;
 
 	if (dir_inode_num) {
@@ -109,23 +112,23 @@ u32 make_directory(struct fs_info *info, struct fs_aux_info *aux_info,
 	}
 
 	if (inode_num == EXT4_ALLOCATE_FAILED) {
-	error(force, setjmp_env, "failed to allocate inode\n");
+		error(force, setjmp_env, "failed to allocate inode\n");
 		return EXT4_ALLOCATE_FAILED;
 	}
 
 	add_directory(info, aux_info, inode_num);
 
-	inode =  get_inode(info, aux_info, ext4_sparse_file, setjmp_env,
+	inode = get_inode(info, aux_info, ext4_sparse_file, setjmp_env,
 			  inode_num);
 	if (inode == NULL) {
-	error(force, setjmp_env, "failed to get inode %u", inode_num);
+		error(force, setjmp_env, "failed to get inode %u", inode_num);
 		return EXT4_ALLOCATE_FAILED;
 	}
 
 	data = inode_allocate_data_extents(info, aux_info, ext4_sparse_file,
 					   force, setjmp_env, inode, len, len);
 	if (data == NULL) {
-	error(force, setjmp_env, "failed to allocate %u extents", len);
+		error(force, setjmp_env, "failed to allocate %u extents", len);
 		return EXT4_ALLOCATE_FAILED;
 	}
 
@@ -160,7 +163,7 @@ u32 make_directory(struct fs_info *info, struct fs_aux_info *aux_info,
 				       dentries[i].filename, offset, len);
 		dentries[i].inode = &dentry->inode;
 		if (!dentry) {
-		error(force, setjmp_env, "failed to add directory");
+			error(force, setjmp_env, "failed to add directory");
 			return EXT4_ALLOCATE_FAILED;
 		}
 	}
@@ -182,11 +185,11 @@ u32 make_file(struct fs_info *info, struct fs_aux_info *aux_info,
 
 	inode_num = allocate_inode(info, aux_info);
 	if (inode_num == EXT4_ALLOCATE_FAILED) {
-	error(force, setjmp_env, "failed to allocate inode\n");
+		error(force, setjmp_env, "failed to allocate inode\n");
 		return EXT4_ALLOCATE_FAILED;
 	}
 
-	inode =  get_inode(info, aux_info, ext4_sparse_file, setjmp_env,
+	inode = get_inode(info, aux_info, ext4_sparse_file, setjmp_env,
 			  inode_num);
 	if (inode == NULL) {
 		error(force, setjmp_env, "failed to get inode %u", inode_num);
@@ -228,7 +231,7 @@ u32 make_link(struct fs_info *info, struct fs_aux_info *aux_info,
 		return EXT4_ALLOCATE_FAILED;
 	}
 
-	inode =  get_inode(info, aux_info, ext4_sparse_file, setjmp_env,
+	inode = get_inode(info, aux_info, ext4_sparse_file, setjmp_env,
 			  inode_num);
 	if (inode == NULL) {
 		error(force, setjmp_env, "failed to get inode %u", inode_num);
@@ -242,7 +245,7 @@ u32 make_link(struct fs_info *info, struct fs_aux_info *aux_info,
 
 	if (len + 1 <= sizeof(inode->i_block)) {
 		/* Fast symlink */
-		memcpy((char*)inode->i_block, link, len);
+		memcpy((char *)inode->i_block, link, len);
 	} else {
 		u8 *data = inode_allocate_data_indirect(info, aux_info,
 							ext4_sparse_file, force,
@@ -276,7 +279,7 @@ u32 make_special(struct fs_info *info, struct fs_aux_info *aux_info,
 		return EXT4_ALLOCATE_FAILED;
 	}
 
-	inode =  get_inode(info, aux_info, ext4_sparse_file, setjmp_env,
+	inode = get_inode(info, aux_info, ext4_sparse_file, setjmp_env,
 			  inode_num);
 	if (inode == NULL) {
 		error(force, setjmp_env, "failed to get inode %u", inode_num);
@@ -321,24 +324,25 @@ int inode_set_permissions(struct fs_info *info, struct fs_aux_info *aux_info,
 static size_t xattr_free_space(int force, jmp_buf *setjmp_env,
 			       struct ext4_xattr_entry *entry, char *end)
 {
-	while(!IS_LAST_ENTRY(entry) && (((char *) entry) < end)) {
-		end   -= EXT4_XATTR_SIZE(le32_to_cpu(entry->e_value_size));
-		entry  = EXT4_XATTR_NEXT(entry);
+	while (!IS_LAST_ENTRY(entry) && (((char *)entry) < end)) {
+		end -= EXT4_XATTR_SIZE(le32_to_cpu(entry->e_value_size));
+		entry = EXT4_XATTR_NEXT(entry);
 	}
 
-	if (((char *) entry) > end) {
-	error(force, setjmp_env, "unexpected read beyond end of xattr space");
+	if (((char *)entry) > end) {
+		error(force, setjmp_env,
+		      "unexpected read beyond end of xattr space");
 		return 0;
 	}
 
-	return end - ((char *) entry);
+	return end - ((char *)entry);
 }
 
 /*
  * Returns a pointer to the free space immediately after the
  * last xattr element
  */
-static struct ext4_xattr_entry* xattr_get_last(struct ext4_xattr_entry *entry)
+static struct ext4_xattr_entry *xattr_get_last(struct ext4_xattr_entry *entry)
 {
 	for (; !IS_LAST_ENTRY(entry); entry = EXT4_XATTR_NEXT(entry)) {
 		// skip entry
@@ -367,7 +371,7 @@ static struct ext4_xattr_entry* xattr_get_last(struct ext4_xattr_entry *entry)
 static void xattr_assert_sane(int force, jmp_buf *setjmp_env,
 			      struct ext4_xattr_entry *entry)
 {
-	for( ; !IS_LAST_ENTRY(entry); entry = EXT4_XATTR_NEXT(entry)) {
+	for (; !IS_LAST_ENTRY(entry); entry = EXT4_XATTR_NEXT(entry)) {
 		struct ext4_xattr_entry *next = EXT4_XATTR_NEXT(entry);
 		if (IS_LAST_ENTRY(next)) {
 			return;
@@ -377,13 +381,17 @@ static void xattr_assert_sane(int force, jmp_buf *setjmp_env,
 		if (cmp == 0)
 			cmp = next->e_name_len - entry->e_name_len;
 		if (cmp == 0)
-			cmp = memcmp(next->e_name, entry->e_name, next->e_name_len);
+			cmp =
+			    memcmp(next->e_name, entry->e_name,
+				   next->e_name_len);
 		if (cmp < 0) {
-		error(force, setjmp_env, "BUG: extended attributes are not sorted\n");
+			error(force, setjmp_env,
+			      "BUG: extended attributes are not sorted\n");
 			return;
 		}
 		if (cmp == 0) {
-		error(force, setjmp_env, "BUG: duplicate extended attributes detected\n");
+			error(force, setjmp_env,
+			      "BUG: duplicate extended attributes detected\n");
 			return;
 		}
 	}
@@ -393,7 +401,7 @@ static void xattr_assert_sane(int force, jmp_buf *setjmp_env,
 #define VALUE_HASH_SHIFT 16
 
 static void ext4_xattr_hash_entry(struct ext4_xattr_header *header,
-		struct ext4_xattr_entry *entry)
+				  struct ext4_xattr_entry *entry)
 {
 	u32 hash = 0;
 	char *name = entry->e_name;
@@ -401,18 +409,17 @@ static void ext4_xattr_hash_entry(struct ext4_xattr_header *header,
 
 	for (n = 0; n < entry->e_name_len; n++) {
 		hash = (hash << NAME_HASH_SHIFT) ^
-			(hash >> (8*sizeof(hash) - NAME_HASH_SHIFT)) ^
-			*name++;
+		    (hash >> (8 * sizeof(hash) - NAME_HASH_SHIFT)) ^ *name++;
 	}
 
 	if (entry->e_value_block == 0 && entry->e_value_size != 0) {
 		u32 *value = (u32 *)((char *)header +
-			le16_to_cpu(entry->e_value_offs));
+				     le16_to_cpu(entry->e_value_offs));
 		for (n = (le32_to_cpu(entry->e_value_size) +
-			EXT4_XATTR_ROUND) >> EXT4_XATTR_PAD_BITS; n; n--) {
+			  EXT4_XATTR_ROUND) >> EXT4_XATTR_PAD_BITS; n; n--) {
 			hash = (hash << VALUE_HASH_SHIFT) ^
-				(hash >> (8*sizeof(hash) - VALUE_HASH_SHIFT)) ^
-				le32_to_cpu(*value++);
+			    (hash >> (8 * sizeof(hash) - VALUE_HASH_SHIFT)) ^
+			    le32_to_cpu(*value++);
 		}
 	}
 	entry->e_hash = cpu_to_le32(hash);
@@ -421,15 +428,15 @@ static void ext4_xattr_hash_entry(struct ext4_xattr_header *header,
 #undef NAME_HASH_SHIFT
 #undef VALUE_HASH_SHIFT
 
-static struct ext4_xattr_entry* xattr_addto_range(
-		int force, jmp_buf *setjmp_env,
-		void *block_start,
-		void *block_end,
-		struct ext4_xattr_entry *first,
-		int name_index,
-		const char *name,
-		const void *value,
-		size_t value_len)
+static struct ext4_xattr_entry *xattr_addto_range(int force,
+						  jmp_buf *setjmp_env,
+						  void *block_start,
+						  void *block_end,
+						  struct ext4_xattr_entry
+						  *first, int name_index,
+						  const char *name,
+						  const void *value,
+						  size_t value_len)
 {
 	size_t name_len = strlen(name);
 	if (name_len > 255)
@@ -437,7 +444,8 @@ static struct ext4_xattr_entry* xattr_addto_range(
 
 	size_t available_size = xattr_free_space(force, setjmp_env,
 						 first, block_end);
-	size_t needed_size = EXT4_XATTR_LEN(name_len) + EXT4_XATTR_SIZE(value_len);
+	size_t needed_size =
+	    EXT4_XATTR_LEN(name_len) + EXT4_XATTR_SIZE(value_len);
 
 	if (needed_size > available_size)
 		return NULL;
@@ -451,8 +459,9 @@ static struct ext4_xattr_entry* xattr_addto_range(
 	new_entry->e_value_block = 0;
 	new_entry->e_value_size = cpu_to_le32(value_len);
 
-	char *val = (char *) new_entry + available_size - EXT4_XATTR_SIZE(value_len);
-	size_t e_value_offs = val - (char *) block_start;
+	char *val =
+	    (char *)new_entry + available_size - EXT4_XATTR_SIZE(value_len);
+	size_t e_value_offs = val - (char *)block_start;
 
 	new_entry->e_value_offs = cpu_to_le16(e_value_offs);
 	memset(val, 0, EXT4_XATTR_SIZE(value_len));
@@ -467,9 +476,10 @@ static int xattr_addto_inode(struct fs_info *info, int force,
 			     int name_index, const char *name,
 			     const void *value, size_t value_len)
 {
-	struct ext4_xattr_ibody_header *hdr = (struct ext4_xattr_ibody_header *) (inode + 1);
-	struct ext4_xattr_entry *first = (struct ext4_xattr_entry *) (hdr + 1);
-	char *block_end = ((char *) inode) + info->inode_size;
+	struct ext4_xattr_ibody_header *hdr =
+	    (struct ext4_xattr_ibody_header *)(inode + 1);
+	struct ext4_xattr_entry *first = (struct ext4_xattr_entry *)(hdr + 1);
+	char *block_end = ((char *)inode) + info->inode_size;
 
 	struct ext4_xattr_entry *result;
 	result = xattr_addto_range(force, setjmp_env, first, block_end, first,
@@ -479,24 +489,30 @@ static int xattr_addto_inode(struct fs_info *info, int force,
 		return -1;
 
 	hdr->h_magic = cpu_to_le32(EXT4_XATTR_MAGIC);
-	inode->i_extra_isize = cpu_to_le16(sizeof(struct ext4_inode) - EXT4_GOOD_OLD_INODE_SIZE);
+	inode->i_extra_isize =
+	    cpu_to_le16(sizeof(struct ext4_inode) - EXT4_GOOD_OLD_INODE_SIZE);
 
 	return 0;
 }
 
 static int xattr_addto_block(struct fs_info *info, struct fs_aux_info *aux_info,
-		struct sparse_file *ext4_sparse_file, int force,
-		jmp_buf *setjmp_env, struct ext4_inode *inode, int name_index,
-		const char *name, const void *value, size_t value_len)
+			     struct sparse_file *ext4_sparse_file, int force,
+			     jmp_buf *setjmp_env, struct ext4_inode *inode,
+			     int name_index, const char *name,
+			     const void *value, size_t value_len)
 {
 	struct ext4_xattr_header *header = get_xattr_block_for_inode(info,
-					     aux_info, ext4_sparse_file, force,
-					     setjmp_env, inode);
+								     aux_info,
+								     ext4_sparse_file,
+								     force,
+								     setjmp_env,
+								     inode);
 	if (!header)
 		return -1;
 
-	struct ext4_xattr_entry *first = (struct ext4_xattr_entry *) (header + 1);
-	char *block_end = ((char *) header) + info->block_size;
+	struct ext4_xattr_entry *first =
+	    (struct ext4_xattr_entry *)(header + 1);
+	char *block_end = ((char *)header) + info->block_size;
 
 	struct ext4_xattr_entry *result = xattr_addto_range(force, setjmp_env,
 							    header, block_end,
@@ -510,7 +526,6 @@ static int xattr_addto_block(struct fs_info *info, struct fs_aux_info *aux_info,
 	ext4_xattr_hash_entry(header, result);
 	return 0;
 }
-
 
 static int xattr_add(struct fs_info *info, struct fs_aux_info *aux_info,
 		     struct sparse_file *ext4_sparse_file, int force,
@@ -539,7 +554,8 @@ static int xattr_add(struct fs_info *info, struct fs_aux_info *aux_info,
 int inode_set_capabilities(struct fs_info *info, struct fs_aux_info *aux_info,
 			   struct sparse_file *ext4_sparse_file, int force,
 			   jmp_buf *setjmp_env, u32 inode_num,
-			   uint64_t capabilities) {
+			   uint64_t capabilities)
+{
 	if (capabilities == 0)
 		return 0;
 
@@ -547,9 +563,9 @@ int inode_set_capabilities(struct fs_info *info, struct fs_aux_info *aux_info,
 	memset(&cap_data, 0, sizeof(cap_data));
 
 	cap_data.magic_etc = VFS_CAP_REVISION | VFS_CAP_FLAGS_EFFECTIVE;
-	cap_data.data[0].permitted = (uint32_t) (capabilities & 0xffffffff);
+	cap_data.data[0].permitted = (uint32_t)(capabilities & 0xffffffff);
 	cap_data.data[0].inheritable = 0;
-	cap_data.data[1].permitted = (uint32_t) (capabilities >> 32);
+	cap_data.data[1].permitted = (uint32_t)(capabilities >> 32);
 	cap_data.data[1].inheritable = 0;
 
 	return xattr_add(info, aux_info, ext4_sparse_file, force, setjmp_env,

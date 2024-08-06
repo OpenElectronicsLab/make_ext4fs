@@ -33,8 +33,8 @@ struct region_list {
 struct block_allocation {
 	struct region_list list;
 	struct region_list oob_list;
-	char* filename;
-	struct block_allocation* next;
+	char *filename;
+	struct block_allocation *next;
 };
 
 struct sparse_file;
@@ -53,12 +53,14 @@ int block_allocation_len(struct block_allocation *alloc);
 struct ext4_inode *get_inode(struct fs_info *info, struct fs_aux_info *aux_info,
 			     struct sparse_file *ext4_sparse_file,
 			     jmp_buf *setjmp_env, u32 inode);
-struct ext4_xattr_header *get_xattr_block_for_inode(struct fs_info *info,
-						struct fs_aux_info *aux_info,
-						struct sparse_file *ext4_sparse_file,
-						int force, jmp_buf *setjmp_env,
-						struct ext4_inode *inode);
-void reduce_allocation(struct fs_aux_info *aux_info, struct block_allocation *alloc, u32 len);
+struct ext4_xattr_header *get_xattr_block_for_inode(struct fs_info *info, struct fs_aux_info
+						    *aux_info, struct sparse_file
+						    *ext4_sparse_file,
+						    int force,
+						    jmp_buf *setjmp_env,
+						    struct ext4_inode *inode);
+void reduce_allocation(struct fs_aux_info *aux_info,
+		       struct block_allocation *alloc, u32 len);
 u32 get_block(struct block_allocation *alloc, u32 block);
 u32 get_oob_block(struct block_allocation *alloc, u32 block);
 void get_next_region(struct block_allocation *alloc);
@@ -66,7 +68,8 @@ void get_region(struct block_allocation *alloc, u32 *block, u32 *len);
 u32 get_free_blocks(struct fs_aux_info *aux_info, u32 bg);
 u32 get_free_inodes(struct fs_aux_info *aux_info, u32 bg);
 u32 reserve_inodes(struct fs_aux_info *aux_info, int bg, u32 inodes);
-void add_directory(struct fs_info *info, struct fs_aux_info *aux_info, u32 inode);
+void add_directory(struct fs_info *info, struct fs_aux_info *aux_info,
+		   u32 inode);
 u16 get_directories(struct fs_aux_info *aux_info, int bg);
 u16 get_bg_flags(struct fs_aux_info *aux_info, int bg);
 u32 allocate_inode(struct fs_info *info, struct fs_aux_info *aux_info);
@@ -76,12 +79,11 @@ int advance_blocks(struct block_allocation *alloc, int blocks);
 int advance_oob_blocks(struct block_allocation *alloc, int blocks);
 int last_region(struct block_allocation *alloc);
 void rewind_alloc(struct block_allocation *alloc);
-void append_region(struct block_allocation *alloc,
-	u32 block, u32 len, int bg);
+void append_region(struct block_allocation *alloc, u32 block, u32 len, int bg);
 struct block_allocation *create_allocation(void);
 int append_oob_allocation(struct fs_aux_info *aux_info, int force,
 			  jmp_buf *setjmp_env, struct block_allocation *alloc,
 			  u32 len);
-void print_blocks(FILE* f, struct block_allocation *alloc);
+void print_blocks(FILE *f, struct block_allocation *alloc);
 
 #endif

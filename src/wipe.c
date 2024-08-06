@@ -61,11 +61,11 @@ int wipe_block_device(int fd, s64 len)
 	return 0;
 }
 
-#else  /* __linux__ */
+#else /* __linux__ */
 #error "Missing block device wiping implementation for this platform!"
 #endif
 
-#else  /* WIPE_IS_SUPPORTED */
+#else /* WIPE_IS_SUPPORTED */
 
 int wipe_block_device(int fd, s64 len)
 {
@@ -73,4 +73,4 @@ int wipe_block_device(int fd, s64 len)
 	return 1;
 }
 
-#endif  /* WIPE_IS_SUPPORTED */
+#endif /* WIPE_IS_SUPPORTED */

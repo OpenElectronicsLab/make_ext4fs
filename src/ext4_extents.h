@@ -30,36 +30,36 @@
 #define EXT_STATS_
 
 struct ext4_extent {
- __le32 ee_block;
- __le16 ee_len;
- __le16 ee_start_hi;
- __le32 ee_start_lo;
+	__le32 ee_block;
+	__le16 ee_len;
+	__le16 ee_start_hi;
+	__le32 ee_start_lo;
 };
 
 struct ext4_extent_idx {
- __le32 ei_block;
- __le32 ei_leaf_lo;
- __le16 ei_leaf_hi;
- __u16 ei_unused;
+	__le32 ei_block;
+	__le32 ei_leaf_lo;
+	__le16 ei_leaf_hi;
+	__u16 ei_unused;
 };
 
 struct ext4_extent_header {
- __le16 eh_magic;
- __le16 eh_entries;
- __le16 eh_max;
- __le16 eh_depth;
- __le32 eh_generation;
+	__le16 eh_magic;
+	__le16 eh_entries;
+	__le16 eh_max;
+	__le16 eh_depth;
+	__le32 eh_generation;
 };
 
 #define EXT4_EXT_MAGIC 0xf30a
 
 struct ext4_ext_path {
- ext4_fsblk_t p_block;
- __u16 p_depth;
- struct ext4_extent *p_ext;
- struct ext4_extent_idx *p_idx;
- struct ext4_extent_header *p_hdr;
- struct buffer_head *p_bh;
+	ext4_fsblk_t p_block;
+	__u16 p_depth;
+	struct ext4_extent *p_ext;
+	struct ext4_extent_idx *p_idx;
+	struct ext4_extent_header *p_hdr;
+	struct buffer_head *p_bh;
 };
 
 #define EXT4_EXT_CACHE_NO 0
@@ -84,5 +84,3 @@ struct ext4_ext_path {
 #define EXT_MAX_INDEX(__hdr__)   (EXT_FIRST_INDEX((__hdr__)) + le16_to_cpu((__hdr__)->eh_max) - 1)
 
 #endif
-
-

@@ -28,5 +28,4 @@ struct sparse_file {
 	struct output_file *out;
 };
 
-
 #endif /* _LIBSPARSE_SPARSE_FILE_H_ */

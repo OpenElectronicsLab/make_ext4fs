@@ -24,10 +24,12 @@ typedef struct {
 #ifdef __cplusplus
 extern "C" {
 #endif
-void	SHA1Transform(uint32_t[5], const u_char[64]);
-void	SHA1Init(SHA1_CTX *);
-void	SHA1Update(SHA1_CTX *, const u_char *, u_int);
-void	SHA1Final(u_char[SHA1_DIGEST_LENGTH], SHA1_CTX *);
+
+void SHA1Transform(uint32_t[5], const u_char[64]);
+void SHA1Init(SHA1_CTX *);
+void SHA1Update(SHA1_CTX *, const u_char *, u_int);
+void SHA1Final(u_char[SHA1_DIGEST_LENGTH], SHA1_CTX *);
+
 #ifdef __cplusplus
 }
 #endif
