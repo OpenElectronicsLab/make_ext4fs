@@ -53,12 +53,12 @@ struct xattr_list_element {
 	struct xattr_list_element *next;
 };
 
-struct block_allocation *create_allocation()
+struct block_allocation *create_allocation(jmp_buf *setjmp_env)
 {
-	struct block_allocation *alloc;
-	alloc = malloc(sizeof(struct block_allocation));
+	size_t size = sizeof(struct block_allocation);
+	struct block_allocation *alloc = malloc(size);
 	if (!alloc) {
-		return NULL;
+		critical_error_errno(setjmp_env, "malloc(%zu)", size);
 	}
 	alloc->list.first = NULL;
 	alloc->list.last = NULL;
@@ -86,13 +86,14 @@ static struct ext4_xattr_header *xattr_list_find(struct fs_aux_info *aux_info,
 }
 
 static void xattr_list_insert(struct fs_aux_info *aux_info,
+			      jmp_buf *setjmp_env,
 			      struct ext4_inode *inode,
 			      struct ext4_xattr_header *header)
 {
-	struct xattr_list_element *element;
-	element = malloc(sizeof(struct xattr_list_element));
+	size_t size = sizeof(struct xattr_list_element);
+	struct xattr_list_element *element = malloc(size);
 	if (!element) {
-		return NULL;
+		critical_error_errno(setjmp_env, "malloc(%zu)", size);
 	}
 	element->inode = inode;
 	element->header = header;
@@ -516,7 +517,7 @@ struct block_allocation *allocate_blocks(struct fs_aux_info *aux_info,
 	if (reg == NULL)
 		return NULL;
 
-	struct block_allocation *alloc = create_allocation();
+	struct block_allocation *alloc = create_allocation(setjmp_env);
 	alloc->list.first = reg;
 	alloc->list.last = reg;
 	alloc->list.iter = alloc->list.first;
@@ -775,7 +776,7 @@ struct ext4_xattr_header *get_xattr_block_for_inode(struct fs_info *info, struct
 		free(block);
 		return NULL;
 	}
-	xattr_list_insert(aux_info, inode, block);
+	xattr_list_insert(aux_info, setjmp_env, inode, block);
 	return block;
 }
 

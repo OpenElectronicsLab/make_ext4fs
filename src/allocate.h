@@ -80,7 +80,7 @@ int advance_oob_blocks(struct block_allocation *alloc, int blocks);
 int last_region(struct block_allocation *alloc);
 void rewind_alloc(struct block_allocation *alloc);
 void append_region(struct block_allocation *alloc, u32 block, u32 len, int bg);
-struct block_allocation *create_allocation(void);
+struct block_allocation *create_allocation(jmp_buf *setjmp_env);
 int append_oob_allocation(struct fs_aux_info *aux_info, int force,
 			  jmp_buf *setjmp_env, struct block_allocation *alloc,
 			  u32 len);

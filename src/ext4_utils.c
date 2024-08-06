@@ -350,7 +350,8 @@ void ext4_create_resize_inode(struct fs_info *info,
 			      struct sparse_file *ext4_sparse_file,
 			      int force, jmp_buf *setjmp_env)
 {
-	struct block_allocation *reserve_inode_alloc = create_allocation();
+	struct block_allocation *reserve_inode_alloc =
+	    create_allocation(setjmp_env);
 	u32 reserve_inode_len = 0;
 	unsigned int i;
 
