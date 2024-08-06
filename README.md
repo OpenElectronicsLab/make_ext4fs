@@ -55,9 +55,11 @@ Some ideas for future work include:
 * add unit tests (refactor as needed to support this)
 * write some documentation
 * create separate build targets, e.g.: static, debug, coverage
+* add valgrind to tests
 * add code coverage reports
 * consider rename more descriptive name (maybe `make-reproducible-ext4fs`)
 * remove dead code in unused code-paths
+* review allocations in `--force` conditions for missing calls to `free()`
 
 ## License and Copyright
 
