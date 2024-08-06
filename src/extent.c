@@ -23,7 +23,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-
 /* Creates data buffers for the first backing_len bytes of a block allocation
    and queues them to be written */
 static u8 *extent_create_backing(struct fs_info *info,
@@ -70,15 +69,19 @@ static void extent_create_backing_file(struct fs_info *info,
 		len = min(region_len * info->block_size, backing_len);
 
 		sparse_file_add_file(ext4_sparse_file, filename, offset, len,
-				region_block);
+				     region_block);
 		offset += len;
 		backing_len -= len;
 	}
 }
 
-static struct block_allocation *do_inode_allocate_extents(struct fs_info *info,
-	struct fs_aux_info *aux_info, struct sparse_file *ext4_sparse_file,
-	int force, jmp_buf *setjmp_env, struct ext4_inode *inode, u64 len)
+static struct block_allocation *do_inode_allocate_extents(struct fs_info *info, struct fs_aux_info
+							  *aux_info, struct sparse_file
+							  *ext4_sparse_file,
+							  int force,
+							  jmp_buf *setjmp_env,
+							  struct ext4_inode
+							  *inode, u64 len)
 {
 	u32 block_len = DIV_ROUND_UP(len, info->block_size);
 	struct block_allocation *alloc = allocate_blocks(aux_info, force,
@@ -105,7 +108,7 @@ static struct block_allocation *do_inode_allocate_extents(struct fs_info *info,
 
 	if (!extent_block) {
 		struct ext4_extent_header *hdr =
-			(struct ext4_extent_header *)&inode->i_block[0];
+		    (struct ext4_extent_header *)&inode->i_block[0];
 		hdr->eh_magic = EXT4_EXT_MAGIC;
 		hdr->eh_entries = allocation_len;
 		hdr->eh_max = 3;
@@ -115,7 +118,7 @@ static struct block_allocation *do_inode_allocate_extents(struct fs_info *info,
 		extent = (struct ext4_extent *)&inode->i_block[3];
 	} else {
 		struct ext4_extent_header *hdr =
-			(struct ext4_extent_header *)&inode->i_block[0];
+		    (struct ext4_extent_header *)&inode->i_block[0];
 		hdr->eh_magic = EXT4_EXT_MAGIC;
 		hdr->eh_entries = 1;
 		hdr->eh_max = 3;
@@ -123,7 +126,7 @@ static struct block_allocation *do_inode_allocate_extents(struct fs_info *info,
 		hdr->eh_depth = 1;
 
 		struct ext4_extent_idx *idx =
-			(struct ext4_extent_idx *)&inode->i_block[3];
+		    (struct ext4_extent_idx *)&inode->i_block[3];
 		idx->ei_block = 0;
 		idx->ei_leaf_lo = extent_block;
 		idx->ei_leaf_hi = 0;
@@ -134,25 +137,32 @@ static struct block_allocation *do_inode_allocate_extents(struct fs_info *info,
 			critical_error_errno(setjmp_env, "calloc");
 
 		sparse_file_add_data(ext4_sparse_file, data, info->block_size,
-				extent_block);
+				     extent_block);
 
-		if (((int)(info->block_size - sizeof(struct ext4_extent_header) /
-				sizeof(struct ext4_extent))) < allocation_len) {
-		error(force, setjmp_env, "File size %"PRIu64" is too big to fit in a single extent block\n",
-					len);
+		if (((int)
+		     (info->block_size -
+		      sizeof(struct ext4_extent_header) /
+		      sizeof(struct ext4_extent))) < allocation_len) {
+			error(force, setjmp_env,
+			      "File size %" PRIu64
+			      " is too big to fit in a single extent block\n",
+			      len);
 			return NULL;
 		}
 
 		hdr = (struct ext4_extent_header *)data;
 		hdr->eh_magic = EXT4_EXT_MAGIC;
 		hdr->eh_entries = allocation_len;
-		hdr->eh_max = (info->block_size - sizeof(struct ext4_extent_header)) /
-			sizeof(struct ext4_extent);
+		hdr->eh_max =
+		    (info->block_size -
+		     sizeof(struct ext4_extent_header)) /
+		    sizeof(struct ext4_extent);
 		hdr->eh_generation = 0;
 		hdr->eh_depth = 0;
 
 		extent = (struct ext4_extent *)(data +
-			sizeof(struct ext4_extent_header));
+						sizeof(struct
+						       ext4_extent_header));
 	}
 
 	for (; !last_region(alloc); extent++, get_next_region(alloc)) {
@@ -170,7 +180,7 @@ static struct block_allocation *do_inode_allocate_extents(struct fs_info *info,
 	if (extent_block)
 		block_len += 1;
 
-	blocks = (u64)block_len * info->block_size / 512;
+	blocks = (u64)block_len *info->block_size / 512;
 
 	inode->i_flags |= EXT4_EXTENTS_FL;
 	inode->i_size_lo = len;
@@ -200,7 +210,7 @@ u8 *inode_allocate_data_extents(struct fs_info *info,
 					  force, setjmp_env, inode, len);
 	if (alloc == NULL) {
 		error(force, setjmp_env,
-		      "failed to allocate extents for %"PRIu64" bytes", len);
+		      "failed to allocate extents for %" PRIu64 " bytes", len);
 		return NULL;
 	}
 
@@ -209,7 +219,7 @@ u8 *inode_allocate_data_extents(struct fs_info *info,
 					     setjmp_env, alloc, backing_len);
 		if (!data)
 			error(force, setjmp_env,
-			      "failed to create backing for %"PRIu64" bytes",
+			      "failed to create backing for %" PRIu64 " bytes",
 			      backing_len);
 	}
 
@@ -220,10 +230,8 @@ u8 *inode_allocate_data_extents(struct fs_info *info,
 
 /* Allocates enough blocks to hold len bytes, queues them to be written
    from a file, and connects them to an inode. */
-struct block_allocation *inode_allocate_file_extents(struct fs_info *info,
-						     struct fs_aux_info
-						     *aux_info,
-						     struct sparse_file
+struct block_allocation *inode_allocate_file_extents(struct fs_info *info, struct fs_aux_info
+						     *aux_info, struct sparse_file
 						     *ext4_sparse_file,
 						     int force,
 						     jmp_buf *setjmp_env,
@@ -257,7 +265,8 @@ void inode_allocate_extents(struct fs_info *info, struct fs_aux_info *aux_info,
 	alloc = do_inode_allocate_extents(info, aux_info, ext4_sparse_file,
 					  force, setjmp_env, inode, len);
 	if (alloc == NULL) {
-	error(force, setjmp_env, "failed to allocate extents for %"PRIu64" bytes", len);
+		error(force, setjmp_env,
+		      "failed to allocate extents for %" PRIu64 " bytes", len);
 		return;
 	}
 

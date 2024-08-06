@@ -56,9 +56,9 @@ struct output_file_ops {
 
 struct sparse_file_ops {
 	int (*write_data_chunk)(struct output_file *out, unsigned int len,
-			void *data);
+				void *data);
 	int (*write_fill_chunk)(struct output_file *out, unsigned int len,
-			uint32_t fill_val);
+				uint32_t fill_val);
 	int (*write_skip_chunk)(struct output_file *out, int64_t len);
 	int (*write_end_chunk)(struct output_file *out);
 };
@@ -181,7 +181,6 @@ static int gz_file_open(struct output_file *out, int fd)
 	return 0;
 }
 
-
 static int gz_file_skip(struct output_file *out, int64_t cnt)
 {
 	off_t ret;
@@ -275,7 +274,8 @@ static int callback_file_skip(struct output_file *out, int64_t off)
 	return 0;
 }
 
-static int callback_file_pad(struct output_file *out __unused, int64_t len __unused)
+static int callback_file_pad(struct output_file *out __unused,
+			     int64_t len __unused)
 {
 	return -1;
 }
@@ -330,8 +330,9 @@ static int write_sparse_skip_chunk(struct output_file *out, int64_t skip_len)
 	int ret;
 
 	if (skip_len % out->block_size) {
-		error("don't care size %"PRIi64" is not a multiple of the block size %u",
-				skip_len, out->block_size);
+		error("don't care size %" PRIi64
+		      " is not a multiple of the block size %u", skip_len,
+		      out->block_size);
 		return -1;
 	}
 
@@ -351,7 +352,7 @@ static int write_sparse_skip_chunk(struct output_file *out, int64_t skip_len)
 }
 
 static int write_sparse_fill_chunk(struct output_file *out, unsigned int len,
-		uint32_t fill_val)
+				   uint32_t fill_val)
 {
 	chunk_header_t chunk_header;
 	int rnd_up_len, count;
@@ -376,7 +377,9 @@ static int write_sparse_fill_chunk(struct output_file *out, unsigned int len,
 	if (out->use_crc) {
 		count = out->block_size / sizeof(uint32_t);
 		while (count--)
-			out->crc32 = sparse_crc32(out->crc32, &fill_val, sizeof(uint32_t));
+			out->crc32 =
+			    sparse_crc32(out->crc32, &fill_val,
+					 sizeof(uint32_t));
 	}
 
 	out->cur_out_ptr += rnd_up_len;
@@ -386,7 +389,7 @@ static int write_sparse_fill_chunk(struct output_file *out, unsigned int len,
 }
 
 static int write_sparse_data_chunk(struct output_file *out, unsigned int len,
-		void *data)
+				   void *data)
 {
 	chunk_header_t chunk_header;
 	int rnd_up_len, zero_len;
@@ -417,7 +420,8 @@ static int write_sparse_data_chunk(struct output_file *out, unsigned int len,
 	if (out->use_crc) {
 		out->crc32 = sparse_crc32(out->crc32, data, len);
 		if (zero_len)
-			out->crc32 = sparse_crc32(out->crc32, out->zero_buf, zero_len);
+			out->crc32 =
+			    sparse_crc32(out->crc32, out->zero_buf, zero_len);
 	}
 
 	out->cur_out_ptr += rnd_up_len;
@@ -453,14 +457,14 @@ int write_sparse_end_chunk(struct output_file *out)
 }
 
 static struct sparse_file_ops sparse_file_ops = {
-		.write_data_chunk = write_sparse_data_chunk,
-		.write_fill_chunk = write_sparse_fill_chunk,
-		.write_skip_chunk = write_sparse_skip_chunk,
-		.write_end_chunk = write_sparse_end_chunk,
+	.write_data_chunk = write_sparse_data_chunk,
+	.write_fill_chunk = write_sparse_fill_chunk,
+	.write_skip_chunk = write_sparse_skip_chunk,
+	.write_end_chunk = write_sparse_end_chunk,
 };
 
 static int write_normal_data_chunk(struct output_file *out, unsigned int len,
-		void *data)
+				   void *data)
 {
 	int ret;
 	unsigned int rnd_up_len = ALIGN(len, out->block_size);
@@ -478,7 +482,7 @@ static int write_normal_data_chunk(struct output_file *out, unsigned int len,
 }
 
 static int write_normal_fill_chunk(struct output_file *out, unsigned int len,
-		uint32_t fill_val)
+				   uint32_t fill_val)
 {
 	int ret;
 	unsigned int i;
@@ -513,10 +517,10 @@ int write_normal_end_chunk(struct output_file *out)
 }
 
 static struct sparse_file_ops normal_file_ops = {
-		.write_data_chunk = write_normal_data_chunk,
-		.write_fill_chunk = write_normal_fill_chunk,
-		.write_skip_chunk = write_normal_skip_chunk,
-		.write_end_chunk = write_normal_end_chunk,
+	.write_data_chunk = write_normal_data_chunk,
+	.write_fill_chunk = write_normal_fill_chunk,
+	.write_skip_chunk = write_normal_skip_chunk,
+	.write_end_chunk = write_normal_end_chunk,
 };
 
 void output_file_close(struct output_file *out)
@@ -526,7 +530,7 @@ void output_file_close(struct output_file *out)
 }
 
 static int output_file_init(struct output_file *out, int block_size,
-		int64_t len, bool sparse, int chunks, bool crc)
+			    int64_t len, bool sparse, int chunks, bool crc)
 {
 	int ret;
 
@@ -558,22 +562,23 @@ static int output_file_init(struct output_file *out, int block_size,
 
 	if (sparse) {
 		sparse_header_t sparse_header = {
-				.magic = SPARSE_HEADER_MAGIC,
-				.major_version = SPARSE_HEADER_MAJOR_VER,
-				.minor_version = SPARSE_HEADER_MINOR_VER,
-				.file_hdr_sz = SPARSE_HEADER_LEN,
-				.chunk_hdr_sz = CHUNK_HEADER_LEN,
-				.blk_sz = out->block_size,
-				.total_blks = out->len / out->block_size,
-				.total_chunks = chunks,
-				.image_checksum = 0
+			.magic = SPARSE_HEADER_MAGIC,
+			.major_version = SPARSE_HEADER_MAJOR_VER,
+			.minor_version = SPARSE_HEADER_MINOR_VER,
+			.file_hdr_sz = SPARSE_HEADER_LEN,
+			.chunk_hdr_sz = CHUNK_HEADER_LEN,
+			.blk_sz = out->block_size,
+			.total_blks = out->len / out->block_size,
+			.total_chunks = chunks,
+			.image_checksum = 0
 		};
 
 		if (out->use_crc) {
 			sparse_header.total_chunks++;
 		}
 
-		ret = out->ops->write(out, &sparse_header, sizeof(sparse_header));
+		ret =
+		    out->ops->write(out, &sparse_header, sizeof(sparse_header));
 		if (ret < 0) {
 			goto err_write;
 		}
@@ -603,7 +608,8 @@ static struct output_file *output_file_new_gz(void)
 
 static struct output_file *output_file_new_normal(void)
 {
-	struct output_file_normal *outn = calloc(1, sizeof(struct output_file_normal));
+	struct output_file_normal *outn =
+	    calloc(1, sizeof(struct output_file_normal));
 	if (!outn) {
 		error_errno("malloc struct outn");
 		return NULL;
@@ -614,9 +620,10 @@ static struct output_file *output_file_new_normal(void)
 	return &outn->out;
 }
 
-struct output_file *output_file_open_callback(int (*write)(void *, const void *, int),
-		void *priv, unsigned int block_size, int64_t len,
-		int gz __unused, int sparse, int chunks, int crc)
+struct output_file
+*output_file_open_callback(int (*write)(void *, const void *, int),
+			   void *priv, unsigned int block_size, int64_t len,
+			   int gz __unused, int sparse, int chunks, int crc)
 {
 	int ret;
 	struct output_file_callback *outc;
@@ -631,7 +638,8 @@ struct output_file *output_file_open_callback(int (*write)(void *, const void *,
 	outc->priv = priv;
 	outc->write = write;
 
-	ret = output_file_init(&outc->out, block_size, len, sparse, chunks, crc);
+	ret =
+	    output_file_init(&outc->out, block_size, len, sparse, chunks, crc);
 	if (ret < 0) {
 		free(outc);
 		return NULL;
@@ -640,8 +648,9 @@ struct output_file *output_file_open_callback(int (*write)(void *, const void *,
 	return &outc->out;
 }
 
-struct output_file *output_file_open_fd(int fd, unsigned int block_size, int64_t len,
-		int gz, int sparse, int chunks, int crc)
+struct output_file *output_file_open_fd(int fd, unsigned int block_size,
+					int64_t len, int gz, int sparse,
+					int chunks, int crc)
 {
 	int ret;
 	struct output_file *out;
@@ -674,13 +683,13 @@ int write_data_chunk(struct output_file *out, unsigned int len, void *data)
 
 /* Write a contiguous region of data blocks with a fill value */
 int write_fill_chunk(struct output_file *out, unsigned int len,
-		uint32_t fill_val)
+		     uint32_t fill_val)
 {
 	return out->sparse_ops->write_fill_chunk(out, len, fill_val);
 }
 
 int write_fd_chunk(struct output_file *out, unsigned int len,
-		int fd, int64_t offset)
+		   int fd, int64_t offset)
 {
 	int ret;
 	int64_t aligned_offset;
@@ -693,7 +702,7 @@ int write_fd_chunk(struct output_file *out, unsigned int len,
 	buffer_size = len + aligned_diff;
 
 	char *data = mmap(NULL, buffer_size, PROT_READ, MAP_SHARED, fd,
-			aligned_offset);
+			  aligned_offset);
 	if (data == MAP_FAILED) {
 		return -errno;
 	}
@@ -708,7 +717,7 @@ int write_fd_chunk(struct output_file *out, unsigned int len,
 
 /* Write a contiguous region of data blocks from a file */
 int write_file_chunk(struct output_file *out, unsigned int len,
-		const char *file, int64_t offset)
+		     const char *file, int64_t offset)
 {
 	int ret;
 

@@ -10,8 +10,11 @@ CFLAGS += -Isrc/include -Isrc/libsparse -Isrc/libsparse/include
 BUILD_DIR ?= ./build
 
 default: $(BUILD_DIR)/make_ext4fs
-ZLIB := -lz
 
+# extracted from https://github.com/torvalds/linux/blob/master/scripts/Lindent
+LINDENT = indent -npro -kr -i8 -ts8 -sob -l80 -ss -ncs -cp1 -il0
+
+ZLIB := -lz
 ifeq ($(STATIC),1)
 	ZLIB += -Wl,-Bstatic -Wl,-Bdynamic
 endif
@@ -66,6 +69,23 @@ check-blockfile: tests/build-and-test.sh $(BUILD_DIR)/make_ext4fs
 .PHONY: check
 check: check-device check-blockfile
 	@echo SUCCESS $@
+
+.PHONY: tidy
+tidy:
+	patch -Np1 -i misc/workaround-indent-bug-65165.patch
+	$(LINDENT) \
+		-T size_t -T ssize_t \
+		-T uint8_t -T int8_t \
+		-T uint16_t -T int16_t \
+		-T uint32_t -T int32_t \
+		-T uint64_t -T int64_t \
+		-T FILE \
+		-T jmp_buf \
+		-T output_file \
+		-T u8 -T u16 -T u32 -T u64 \
+		-T u_int32_t \
+		`find src -name '*.h' -o -name '*.c'`
+	patch -Rp1 -i misc/workaround-indent-bug-65165.patch
 
 .PHONY: clean
 clean:

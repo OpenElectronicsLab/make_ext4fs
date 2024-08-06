@@ -22,7 +22,6 @@
 
 #include "canned_fs_config.h"
 
-
 static int fs_config_path_compare(const void *a, const void *b)
 {
 	return strcmp(((struct fs_config_path *)a)->path,
@@ -126,10 +125,15 @@ int canned_fs_config(struct fs_config_list *config_list, const char *path,
 	uint64_t c_capabilities;
 	fs_config(path, dir, &c_uid, &c_gid, &c_mode, &c_capabilities);
 
-	if (c_uid != *uid) printf("%s uid %d %d\n", path, *uid, c_uid);
-	if (c_gid != *gid) printf("%s gid %d %d\n", path, *gid, c_gid);
-	if (c_mode != *mode) printf("%s mode 0%o 0%o\n", path, *mode, c_mode);
-	if (c_capabilities != *capabilities) printf("%s capabilities %llx %llx\n", path, *capabilities, c_capabilities);
+	if (c_uid != *uid)
+		printf("%s uid %d %d\n", path, *uid, c_uid);
+	if (c_gid != *gid)
+		printf("%s gid %d %d\n", path, *gid, c_gid);
+	if (c_mode != *mode)
+		printf("%s mode 0%o 0%o\n", path, *mode, c_mode);
+	if (c_capabilities != *capabilities)
+		printf("%s capabilities %llx %llx\n", path, *capabilities,
+		       c_capabilities);
 #endif
 
 	return 1;

@@ -7,26 +7,26 @@
 #define EXT4_XATTR_INDEX_SECURITY 6
 
 struct ext4_xattr_header {
-    __le32  h_magic;
-    __le32  h_refcount;
-    __le32  h_blocks;
-    __le32  h_hash;
-    __le32  h_checksum;
-    __u32   h_reserved[3];
+	__le32 h_magic;
+	__le32 h_refcount;
+	__le32 h_blocks;
+	__le32 h_hash;
+	__le32 h_checksum;
+	__u32 h_reserved[3];
 };
 
 struct ext4_xattr_ibody_header {
-    __le32  h_magic;
+	__le32 h_magic;
 };
 
 struct ext4_xattr_entry {
-    __u8 e_name_len;
-    __u8 e_name_index;
-    __le16 e_value_offs;
-    __le32 e_value_block;
-    __le32 e_value_size;
-    __le32 e_hash;
-    char e_name[0];
+	__u8 e_name_len;
+	__u8 e_name_index;
+	__le16 e_value_offs;
+	__le32 e_value_block;
+	__le32 e_value_size;
+	__le32 e_hash;
+	char e_name[0];
 };
 
 #define EXT4_XATTR_PAD_BITS 2

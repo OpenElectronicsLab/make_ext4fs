@@ -74,7 +74,7 @@ struct block_allocation;
 
 #define EXT4_JNL_BACKUP_BLOCKS 1
 
-#ifndef min /* already defined by windows.h */
+#ifndef min			/* already defined by windows.h */
 #define min(a, b) ((a) < (b) ? (a) : (b))
 #endif
 
@@ -99,7 +99,7 @@ typedef unsigned short int u16;
 typedef unsigned char u8;
 
 struct fs_config_list;
-typedef int (*fs_config_func_t)(struct fs_config_list *config_list,
+typedef int (*fs_config_func_t)(struct fs_config_list * config_list,
 				const char *path, int dir, unsigned *uid,
 				unsigned *gid, unsigned *mode,
 				uint64_t *capabilities);
@@ -192,7 +192,7 @@ int make_ext4fs_internal(struct fs_info *info, struct fs_aux_info *aux_info,
 			 int uuid_user_specified, int fd,
 			 const char *directory, fs_config_func_t fs_config_func,
 			 int gzip, int sparse, int crc, int wipe, int verbose,
-			 time_t fixed_time, FILE* block_list_file);
+			 time_t fixed_time, FILE *block_list_file);
 
 int read_ext(struct fs_info *info, struct fs_aux_info *aux_info, int force,
 	     jmp_buf *setjmp_env, int fd, int verbose);

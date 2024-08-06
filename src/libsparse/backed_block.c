@@ -95,7 +95,7 @@ int64_t backed_block_file_offset(struct backed_block *bb)
 	assert(bb->type == BACKED_BLOCK_FILE || bb->type == BACKED_BLOCK_FD);
 	if (bb->type == BACKED_BLOCK_FILE) {
 		return bb->file.offset;
-	} else { /* bb->type == BACKED_BLOCK_FD */
+	} else {		/* bb->type == BACKED_BLOCK_FD */
 		return bb->fd.offset;
 	}
 }
@@ -122,7 +122,8 @@ void backed_block_destroy(struct backed_block *bb)
 
 struct backed_block_list *backed_block_list_new(unsigned int block_size)
 {
-	struct backed_block_list *b = calloc(sizeof(struct backed_block_list), 1);
+	struct backed_block_list *b =
+	    calloc(sizeof(struct backed_block_list), 1);
 	b->block_size = block_size;
 	return b;
 }
@@ -142,8 +143,9 @@ void backed_block_list_destroy(struct backed_block_list *bbl)
 }
 
 void backed_block_list_move(struct backed_block_list *from,
-		struct backed_block_list *to, struct backed_block *start,
-		struct backed_block *end)
+			    struct backed_block_list *to,
+			    struct backed_block *start,
+			    struct backed_block *end)
 {
 	struct backed_block *bb;
 
@@ -152,8 +154,7 @@ void backed_block_list_move(struct backed_block_list *from,
 	}
 
 	if (!end) {
-		for (end = start; end && end->next; end = end->next)
-			;
+		for (end = start; end && end->next; end = end->next) ;
 	}
 
 	if (start == NULL || end == NULL) {
@@ -189,7 +190,7 @@ void backed_block_list_move(struct backed_block_list *from,
 
 /* may free b */
 static int merge_bb(struct backed_block_list *bbl,
-		struct backed_block *a, struct backed_block *b)
+		    struct backed_block *a, struct backed_block *b)
 {
 	unsigned int block_len;
 
@@ -206,7 +207,7 @@ static int merge_bb(struct backed_block_list *bbl,
 	}
 
 	/* Blocks are not adjacent */
-	block_len = a->len / bbl->block_size; /* rounds down */
+	block_len = a->len / bbl->block_size;	/* rounds down */
 	if (a->block + block_len != b->block) {
 		return -EINVAL;
 	}
@@ -222,13 +223,13 @@ static int merge_bb(struct backed_block_list *bbl,
 		break;
 	case BACKED_BLOCK_FILE:
 		if (a->file.filename != b->file.filename ||
-				a->file.offset + a->len != b->file.offset) {
+		    a->file.offset + a->len != b->file.offset) {
 			return -EINVAL;
 		}
 		break;
 	case BACKED_BLOCK_FD:
 		if (a->fd.fd != b->fd.fd ||
-				a->fd.offset + a->len != b->fd.offset) {
+		    a->fd.offset + a->len != b->fd.offset) {
 			return -EINVAL;
 		}
 		break;
@@ -268,8 +269,7 @@ static int queue_bb(struct backed_block_list *bbl, struct backed_block *new_bb)
 		bb = bbl->data_blocks;
 	bbl->last_used = new_bb;
 
-	for (; bb->next && bb->next->block < new_bb->block; bb = bb->next)
-		;
+	for (; bb->next && bb->next->block < new_bb->block; bb = bb->next) ;
 
 	if (bb->next == NULL) {
 		bb->next = new_bb;
@@ -286,7 +286,7 @@ static int queue_bb(struct backed_block_list *bbl, struct backed_block *new_bb)
 
 /* Queues a fill block of memory to be written to the specified data blocks */
 int backed_block_add_fill(struct backed_block_list *bbl, unsigned int fill_val,
-		unsigned int len, unsigned int block)
+			  unsigned int len, unsigned int block)
 {
 	struct backed_block *bb = calloc(1, sizeof(struct backed_block));
 	if (bb == NULL) {
@@ -304,7 +304,7 @@ int backed_block_add_fill(struct backed_block_list *bbl, unsigned int fill_val,
 
 /* Queues a block of memory to be written to the specified data blocks */
 int backed_block_add_data(struct backed_block_list *bbl, void *data,
-		unsigned int len, unsigned int block)
+			  unsigned int len, unsigned int block)
 {
 	struct backed_block *bb = calloc(1, sizeof(struct backed_block));
 	if (bb == NULL) {
@@ -322,7 +322,7 @@ int backed_block_add_data(struct backed_block_list *bbl, void *data,
 
 /* Queues a chunk of a file on disk to be written to the specified data blocks */
 int backed_block_add_file(struct backed_block_list *bbl, const char *filename,
-		int64_t offset, unsigned int len, unsigned int block)
+			  int64_t offset, unsigned int len, unsigned int block)
 {
 	struct backed_block *bb = calloc(1, sizeof(struct backed_block));
 	if (bb == NULL) {
@@ -341,7 +341,7 @@ int backed_block_add_file(struct backed_block_list *bbl, const char *filename,
 
 /* Queues a chunk of a fd to be written to the specified data blocks */
 int backed_block_add_fd(struct backed_block_list *bbl, int fd, int64_t offset,
-		unsigned int len, unsigned int block)
+			unsigned int len, unsigned int block)
 {
 	struct backed_block *bb = calloc(1, sizeof(struct backed_block));
 	if (bb == NULL) {
@@ -359,7 +359,7 @@ int backed_block_add_fd(struct backed_block_list *bbl, int fd, int64_t offset,
 }
 
 int backed_block_split(struct backed_block_list *bbl, struct backed_block *bb,
-		unsigned int max_len)
+		       unsigned int max_len)
 {
 	struct backed_block *new_bb;
 

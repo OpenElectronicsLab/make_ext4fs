@@ -1,0 +1,104 @@
+Dumb work-around for GNU indent extern C bug
+
+bug #65165: extern "C" mishandled in header files
+https://savannah.gnu.org/bugs/index.php?65165
+
+--- a/src/ext4_sb.h
++++ b/src/ext4_sb.h
+@@ -21,9 +21,11 @@
+ 
+ #define EXT4_SUPER_MAGIC 0xEF53
+ 
++/*
+ #ifdef __cplusplus
+ extern "C" {
+ #endif
++*/
+ 
+ struct fs_info {
+ 	int64_t len;		/* If set to 0, ask the block device for the size,
+@@ -47,8 +49,10 @@ struct fs_info {
+ 
+ int ext4_parse_sb(struct ext4_super_block *sb, struct fs_info *info);
+ 
++/*
+ #ifdef __cplusplus
+ }
+ #endif
++*/
+ 
+ #endif
+--- a/src/ext4_utils.h
++++ b/src/ext4_utils.h
+@@ -17,9 +17,11 @@
+ #ifndef _EXT4_UTILS_H_
+ #define _EXT4_UTILS_H_
+ 
++/*
+ #ifdef __cplusplus
+ extern "C" {
+ #endif
++*/
+ 
+ #ifndef _GNU_SOURCE
+ #define _GNU_SOURCE
+@@ -197,8 +199,10 @@ int make_ext4fs_internal(struct fs_info *info, struct fs_aux_info *aux_info,
+ int read_ext(struct fs_info *info, struct fs_aux_info *aux_info, int force,
+ 	     jmp_buf *setjmp_env, int fd, int verbose);
+ 
++/*
+ #ifdef __cplusplus
+ }
+ #endif
++*/
+ 
+ #endif
+--- a/src/libsparse/include/sparse/sparse.h
++++ b/src/libsparse/include/sparse/sparse.h
+@@ -21,9 +21,11 @@
+ #include <stddef.h>
+ #include <stdint.h>
+ 
++/*
+ #ifdef	__cplusplus
+ extern "C" {
+ #endif
++*/
+ 
+ struct sparse_file;
+ 
+@@ -291,8 +293,10 @@ void sparse_file_verbose(struct sparse_file *s);
+  */
+ extern void (*sparse_print_verbose)(const char *fmt, ...);
+ 
++/*
+ #ifdef	__cplusplus
+ }
+ #endif
++*/
+ 
+ #endif
+--- a/src/sha1.h
++++ b/src/sha1.h
+@@ -21,17 +21,21 @@ typedef struct {
+ 	u_char buffer[64];
+ } SHA1_CTX;
+ 
++/*
+ #ifdef __cplusplus
+ extern "C" {
+ #endif
++*/
+ 
+ void SHA1Transform(uint32_t[5], const u_char[64]);
+ void SHA1Init(SHA1_CTX *);
+ void SHA1Update(SHA1_CTX *, const u_char *, u_int);
+ void SHA1Final(u_char[SHA1_DIGEST_LENGTH], SHA1_CTX *);
+ 
++/*
+ #ifdef __cplusplus
+ }
+ #endif
++*/
+ 
+ #endif /* _SYS_SHA1_H_ */

@@ -23,11 +23,11 @@ int ext4_parse_sb(struct ext4_super_block *sb, struct fs_info *info)
 {
 	uint64_t len_blocks;
 
-        if (sb->s_magic != EXT4_SUPER_MAGIC)
-                return -EINVAL;
+	if (sb->s_magic != EXT4_SUPER_MAGIC)
+		return -EINVAL;
 
-        if ((sb->s_state & EXT4_VALID_FS) != EXT4_VALID_FS)
-                return -EINVAL;
+	if ((sb->s_state & EXT4_VALID_FS) != EXT4_VALID_FS)
+		return -EINVAL;
 
 	info->block_size = 1024 << sb->s_log_block_size;
 	info->blocks_per_group = sb->s_blocks_per_group;
@@ -42,7 +42,7 @@ int ext4_parse_sb(struct ext4_super_block *sb, struct fs_info *info)
 	memcpy(info->uuid, sb->s_uuid, 16);
 
 	len_blocks = ((uint64_t)sb->s_blocks_count_hi << 32) +
-                sb->s_blocks_count_lo;
+	    sb->s_blocks_count_lo;
 	info->len = (uint64_t)info->block_size * len_blocks;
 
 	return 0;
