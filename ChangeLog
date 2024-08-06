@@ -42,6 +42,7 @@
 	* src/wipe.c
 	* src/wipe.h
 	* src/xattr.h
+	* README.md: Roadmap: add memory leak checking
 
 2024-08-05  Eric Herman  <eric@freesa.org>
 
