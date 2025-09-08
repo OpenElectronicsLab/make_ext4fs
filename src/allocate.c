@@ -394,6 +394,7 @@ void block_allocator_free(struct fs_aux_info *aux_info)
 		free(aux_info->bgs[i].inode_table);
 	}
 	free(aux_info->bgs);
+	aux_info->bgs = NULL;
 }
 
 static u32 ext4_allocate_blocks_from_block_group(struct fs_aux_info *aux_info,
@@ -885,5 +886,16 @@ void free_alloc(struct block_allocation *alloc)
 		reg = next;
 	}
 
+	free(alloc->filename);
+
 	free(alloc);
+}
+
+void free_alloc_all(struct block_allocation *alloc)
+{
+	while (alloc) {
+		struct block_allocation *ba_next = alloc->next;
+		free_alloc(alloc);
+		alloc = ba_next;
+	}
 }

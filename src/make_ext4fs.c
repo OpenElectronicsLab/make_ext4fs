@@ -17,10 +17,9 @@
 #include "ext4_utils.h"
 #include "allocate.h"
 #include "contents.h"
+#include "sparse_file.h"
 #include "uuid5.h"
 #include "wipe.h"
-
-#include <sparse/sparse.h>
 
 #include <assert.h>
 #include <dirent.h>
@@ -85,7 +84,7 @@ static u32 build_directory_structure(struct fs_info *info,
 				     struct fs_aux_info *aux_info,
 				     struct sparse_file *ext4_sparse_file,
 				     struct block_allocation
-				     *saved_allocation_head,
+				     **saved_allocation_head,
 				     struct fs_config_list *config_list,
 				     int force, jmp_buf *setjmp_env,
 				     const char *full_path,
@@ -229,6 +228,7 @@ static u32 build_directory_structure(struct fs_info *info,
 		}
 		memset(tmp, 0, sizeof(struct dentry));
 		memcpy(tmp + 1, dentries, entries * sizeof(struct dentry));
+		free(dentries);
 		dentries = tmp;
 
 		dentries[0].filename = strdup("lost+found");
@@ -443,24 +443,36 @@ static char *canonicalize_rel_slashes(jmp_buf *setjmp_env, const char *str)
 	return canonicalize_slashes(setjmp_env, str, false);
 }
 
-int make_ext4fs_internal(struct fs_info *info, struct fs_aux_info *aux_info,
-			 struct sparse_file *ext4_sparse_file,
-			 struct block_allocation *saved_allocation_head,
-			 struct fs_config_list *config_list,
-			 int force, jmp_buf *setjmp_env,
+int make_ext4fs_internal(struct fs_info *info,
+			 struct fs_config_list *config_list, int force,
 			 int uuid_user_specified, int fd,
 			 const char *_directory,
 			 fs_config_func_t fs_config_func, int gzip, int sparse,
 			 int crc, int wipe, int verbose, time_t fixed_time,
 			 FILE *block_list_file)
 {
+	jmp_buf setjmp_env_buf;
+	jmp_buf *setjmp_env = &setjmp_env_buf;
+	struct fs_aux_info *aux_info = NULL;
+	struct sparse_file *ext4_sparse_file = NULL;
+	struct block_allocation *saved_allocation_head = NULL;
 	u32 root_inode_num;
 	u16 root_mode;
 	char *directory = NULL;
 	char buf[40];
+	int rval = EXIT_FAILURE;
+
+	memset(setjmp_env, 0x00, sizeof(jmp_buf));
+
+	aux_info = calloc(1, sizeof(struct fs_aux_info));
+	if (!aux_info) {
+		goto make_ext4fs_internal_end;
+	}
 
 	if (setjmp(*setjmp_env))
-		return EXIT_FAILURE;	/* Handle a call to longjmp() */
+		goto make_ext4fs_internal_end;	/* Handle a call to longjmp() */
+
+	saved_allocation_head = create_allocation(setjmp_env);
 
 	if (_directory)
 		directory = canonicalize_rel_slashes(setjmp_env, _directory);
@@ -470,7 +482,7 @@ int make_ext4fs_internal(struct fs_info *info, struct fs_aux_info *aux_info,
 
 	if (info->len <= 0) {
 		fprintf(stderr, "Need size of filesystem\n");
-		return EXIT_FAILURE;
+		goto make_ext4fs_internal_end;
 	}
 
 	ftruncate(fd, 0);
@@ -560,7 +572,7 @@ int make_ext4fs_internal(struct fs_info *info, struct fs_aux_info *aux_info,
 	if (directory)
 		root_inode_num = build_directory_structure(info, aux_info,
 							   ext4_sparse_file,
-							   saved_allocation_head,
+							   &saved_allocation_head,
 							   config_list, force,
 							   setjmp_env,
 							   directory, "", 0,
@@ -600,12 +612,12 @@ int make_ext4fs_internal(struct fs_info *info, struct fs_aux_info *aux_info,
 		}
 	}
 
+	struct ext4_super_block *sb = aux_info->sb;
 	printf("Created filesystem with %d/%d inodes and %d/%d blocks\n",
-	       aux_info->sb->s_inodes_count - aux_info->sb->s_free_inodes_count,
-	       aux_info->sb->s_inodes_count,
-	       aux_info->sb->s_blocks_count_lo -
-	       aux_info->sb->s_free_blocks_count_lo,
-	       aux_info->sb->s_blocks_count_lo);
+	       sb->s_inodes_count - sb->s_free_inodes_count,
+	       sb->s_inodes_count,
+	       sb->s_blocks_count_lo - sb->s_free_blocks_count_lo,
+	       sb->s_blocks_count_lo);
 
 	if (wipe && WIPE_IS_SUPPORTED) {
 		wipe_block_device(fd, info->len);
@@ -613,10 +625,36 @@ int make_ext4fs_internal(struct fs_info *info, struct fs_aux_info *aux_info,
 
 	write_ext4_image(ext4_sparse_file, fd, gzip, sparse, crc);
 
-	sparse_file_destroy(ext4_sparse_file);
-	ext4_sparse_file = NULL;
+	rval = EXIT_SUCCESS;
+
+make_ext4fs_internal_end:
+
+	if (ext4_sparse_file) {
+		sparse_file_destroy(ext4_sparse_file);
+		ext4_sparse_file = NULL;
+	}
 
 	free(directory);
+	directory = NULL;
 
-	return 0;
+	if (aux_info) {
+		block_allocator_free(aux_info);
+
+		free(aux_info->bg_desc);
+		aux_info->bg_desc = NULL;
+
+		free(aux_info->backup_sb);
+		aux_info->backup_sb = NULL;
+
+		free(aux_info->sb);
+		aux_info->sb = NULL;
+
+		free(aux_info);
+		aux_info = NULL;
+	}
+
+	free_alloc_all(saved_allocation_head);
+	saved_allocation_head = NULL;
+
+	return rval;
 }

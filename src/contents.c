@@ -177,7 +177,7 @@ u32 make_directory(struct fs_info *info, struct fs_aux_info *aux_info,
 /* Creates a file on disk.  Returns the inode number of the new file */
 u32 make_file(struct fs_info *info, struct fs_aux_info *aux_info,
 	      struct sparse_file *ext4_sparse_file,
-	      struct block_allocation *saved_allocation_head, int force,
+	      struct block_allocation **saved_allocation_head, int force,
 	      jmp_buf *setjmp_env, const char *filename, u64 len)
 {
 	struct ext4_inode *inode;
@@ -204,8 +204,8 @@ u32 make_file(struct fs_info *info, struct fs_aux_info *aux_info,
 						    inode, len, filename);
 		if (alloc) {
 			alloc->filename = strdup(filename);
-			alloc->next = saved_allocation_head;
-			saved_allocation_head = alloc;
+			alloc->next = *saved_allocation_head;
+			*saved_allocation_head = alloc;
 		}
 	}
 

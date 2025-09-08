@@ -74,6 +74,7 @@ u16 get_directories(struct fs_aux_info *aux_info, int bg);
 u16 get_bg_flags(struct fs_aux_info *aux_info, int bg);
 u32 allocate_inode(struct fs_info *info, struct fs_aux_info *aux_info);
 void free_alloc(struct block_allocation *alloc);
+void free_alloc_all(struct block_allocation *alloc);
 int reserve_oob_blocks(struct block_allocation *alloc, jmp_buf *setjmp_env,
 		       int blocks);
 int advance_blocks(struct block_allocation *alloc, int blocks);

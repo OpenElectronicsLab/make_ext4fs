@@ -184,15 +184,13 @@ u16 ext4_crc16(u16 crc_in, const void *buf, int size);
 uint8_t *parse_uuid(uint8_t bytes[16], const char *str, size_t len);
 char *uuid_bin_to_str(char *buf, size_t buf_size, const uint8_t bytes[16]);
 
-int make_ext4fs_internal(struct fs_info *info, struct fs_aux_info *aux_info,
-			 struct sparse_file *ext4_sparse_file,
-			 struct block_allocation *saved_allocation_head,
-			 struct fs_config_list *config_list,
-			 int force, jmp_buf *setjmp_env,
+int make_ext4fs_internal(struct fs_info *info,
+			 struct fs_config_list *config_list, int force,
 			 int uuid_user_specified, int fd,
-			 const char *directory, fs_config_func_t fs_config_func,
-			 int gzip, int sparse, int crc, int wipe, int verbose,
-			 time_t fixed_time, FILE *block_list_file);
+			 const char *_directory,
+			 fs_config_func_t fs_config_func, int gzip, int sparse,
+			 int crc, int wipe, int verbose, time_t fixed_time,
+			 FILE *block_list_file);
 
 int read_ext(struct fs_info *info, struct fs_aux_info *aux_info, int force,
 	     jmp_buf *setjmp_env, int fd, int verbose);

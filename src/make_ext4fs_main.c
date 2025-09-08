@@ -65,18 +65,10 @@ int main(int argc, char **argv)
 	struct fs_config_list config_list;
 	int uuid_user_specified = 0;
 	int force = 0;
-	jmp_buf setjmp_env;
 	struct fs_info info;
-	struct fs_aux_info aux_info;
-	struct sparse_file ext4_sparse_file;
-	struct block_allocation saved_allocation_head;
 
 	memset(&config_list, 0x00, sizeof(struct fs_config_list));
-	memset(&setjmp_env, 0x00, sizeof(jmp_buf));
 	memset(&info, 0x00, sizeof(struct fs_info));
-	memset(&aux_info, 0x00, sizeof(struct fs_aux_info));
-	memset(&ext4_sparse_file, 0x00, sizeof(struct sparse_file));
-	memset(&saved_allocation_head, 0x00, sizeof(struct block_allocation));
 
 	while ((opt =
 		getopt(argc, argv, "l:j:b:g:i:I:L:u:T:C:B:m:fwzJsctv")) != -1) {
@@ -206,9 +198,8 @@ int main(int argc, char **argv)
 		fd = STDOUT_FILENO;
 	}
 
-	exitcode = make_ext4fs_internal(&info, &aux_info, &ext4_sparse_file,
-					&saved_allocation_head, &config_list,
-					force, &setjmp_env, uuid_user_specified,
+	exitcode = make_ext4fs_internal(&info, &config_list,
+					force, uuid_user_specified,
 					fd, directory, fs_config_func, gzip,
 					sparse, crc, wipe, verbose, fixed_time,
 					block_list_file);
@@ -217,5 +208,6 @@ int main(int argc, char **argv)
 		fclose(block_list_file);
 	if (exitcode && strcmp(filename, "-"))
 		unlink(filename);
+
 	return exitcode;
 }

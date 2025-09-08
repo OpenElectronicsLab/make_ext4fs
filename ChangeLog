@@ -2,6 +2,13 @@
 
 	Elevate leak visibility with Valgrind
 
+	* src/allocate.c: add free_alloc_all, free the strdup-ed filename
+	* src/allocate.h: add free_alloc_all
+	* src/contents.c: adjust the saved_allocation_head from the caller
+	* src/contents.h: pass in reference to pointer
+	* src/ext4_utils.h: make_ext4fs_internal() reduce param list
+	* src/make_ext4fs.c: fix leaks, _internal() now creates and frees more
+	* src/make_ext4fs_main.c: make_ext4fs_internal() reduce param list
 	* Makefile: CFLAGS add -g -Wall -Wextra
 	* tests/build-and-test.sh: use valgrind if available
 

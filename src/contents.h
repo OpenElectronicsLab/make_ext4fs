@@ -38,7 +38,7 @@ u32 make_directory(struct fs_info *info, struct fs_aux_info *aux_info,
 		   struct dentry *dentries, u32 dirs);
 u32 make_file(struct fs_info *info, struct fs_aux_info *aux_info,
 	      struct sparse_file *ext4_sparse_file,
-	      struct block_allocation *saved_allocation_head, int force,
+	      struct block_allocation **saved_allocation_head, int force,
 	      jmp_buf *setjmp_env, const char *filename, u64 len);
 u32 make_link(struct fs_info *info, struct fs_aux_info *aux_info,
 	      struct sparse_file *ext4_sparse_file, int force,
