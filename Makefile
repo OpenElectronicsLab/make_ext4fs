@@ -5,7 +5,10 @@
 # Copyright (C) 2024 Eric Herman <eric@freesa.org>
 
 CC ?= gcc
-CFLAGS += -Isrc/include -Isrc/libsparse -Isrc/libsparse/include
+# -pedantic -Wc++-compat -Wcast-qual
+CFLAGS := -g -Wall -Wextra \
+ -Isrc/include -Isrc/libsparse -Isrc/libsparse/include \
+ $(CFLAGS)
 
 BUILD_DIR ?= ./build
 

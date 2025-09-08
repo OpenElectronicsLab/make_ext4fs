@@ -20,6 +20,13 @@ else
 	UUID_IN="$UUID_MIXED_CASE"
 fi
 
+if [ -z "$VALGRIND" ]; then
+	if command -v valgrind >/dev/null 2>&1; then
+		VALGRIND='valgrind --leak-check=full'
+	fi
+fi
+
+
 if [ -z "$BUILD_DIR" ]; then
 	export BUILD_DIR=.
 fi
@@ -51,7 +58,9 @@ fi
 function cleanup() {
 	sudo umount -v $DEV_LOOPX || true
 	sudo losetup -v -d $DEV_LOOPX || true
-	sudo rm -vfr $TEST_DIR || true
+	if [ -z "KEEP_TEST_DIR" ]; then
+		sudo rm -vfr $TEST_DIR || true
+	fi
 	echo "cleanup complete"
 }
 trap cleanup EXIT
@@ -63,7 +72,7 @@ echo "foo" > $TEST_DIR/test-fs-files/foo.txt
 mkdir -pv $TEST_DIR/test-out
 
 FS_EPOCH=1
-sudo $TEST_DIR/make_ext4fs -v \
+sudo $VALGRIND $TEST_DIR/make_ext4fs -v \
 	-T $FS_EPOCH \
 	-L test-fs-foo \
 	-u "$UUID_IN" \

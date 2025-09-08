@@ -1,3 +1,10 @@
+2025-09-08  Eric Herman  <eric@freesa.org>
+
+	Elevate leak visibility with Valgrind
+
+	* Makefile: CFLAGS add -g -Wall -Wextra
+	* tests/build-and-test.sh: use valgrind if available
+
 2024-08-06  Eric Herman  <eric@freesa.org>
 
 	Guard against some malloc()/calloc() failures
