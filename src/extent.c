@@ -17,7 +17,7 @@
 #include "ext4_utils.h"
 #include "extent.h"
 
-#include <sparse/sparse.h>
+#include "sparse/sparse.h"
 
 #include <inttypes.h>
 #include <stdlib.h>

@@ -5,6 +5,10 @@
 
 	Add linked list structure for tracking pointers and their sizes.
 
+	Makefile simplification: no sense in having the sparse object files in
+	their own directory as we are not treating it like a sub-module.
+	Include consistency: use double quotes, not angle-brackets for sparse.
+
 	* src/allocate.c: add vps_list_add(), vps_list_free()
 	* src/allocate.h: add struct vps_list, vps_list_add(), vps_list_free()
 	* src/contents.c: long_life_bufs param added to functions
@@ -15,9 +19,14 @@
 	* src/extent.h: long_life_bufs param added to functions
 	* src/indirect.c: inode_attach_resize() add block_data to long_life_bufs
 	* src/indirect.h: long_life_bufs param added to functions
+	* src/libsparse/output_file.h: include consistency
+	* src/libsparse/sparse.c: include consistency
+	* src/libsparse/sparse_err.c: include consistency
+	* src/libsparse/sparse_read.c: include consistency
 	* src/make_ext4fs.c: add vps_list long_life_bufs
 	* README.md: Roadmap: remove "add valgrind" (done)
 	* misc/workaround-indent-bug-65165.patch: update
+	* Makefile: single list of .o files
 
 2025-09-08  Eric Herman  <eric@freesa.org>
 

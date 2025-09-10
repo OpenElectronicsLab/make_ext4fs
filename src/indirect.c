@@ -18,7 +18,7 @@
 #include "indirect.h"
 #include "allocate.h"
 
-#include <sparse/sparse.h>
+#include "sparse/sparse.h"
 
 #include <stdlib.h>
 #include <stdio.h>

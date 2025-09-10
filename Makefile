@@ -24,29 +24,27 @@ endif
 
 OBJ :=	\
 	$(BUILD_DIR)/allocate.o \
+	$(BUILD_DIR)/backed_block.o \
 	$(BUILD_DIR)/canned_fs_config.o \
 	$(BUILD_DIR)/contents.o \
 	$(BUILD_DIR)/crc16.o \
-	$(BUILD_DIR)/ext4fixup.o \
 	$(BUILD_DIR)/ext4_sb.o \
 	$(BUILD_DIR)/ext4_utils.o \
+	$(BUILD_DIR)/ext4fixup.o \
 	$(BUILD_DIR)/extent.o \
 	$(BUILD_DIR)/indirect.o \
-	$(BUILD_DIR)/make_ext4fs_main.o \
 	$(BUILD_DIR)/make_ext4fs.o \
+	$(BUILD_DIR)/make_ext4fs_main.o \
+	$(BUILD_DIR)/output_file.o \
 	$(BUILD_DIR)/sha1.o \
+	$(BUILD_DIR)/sparse.o \
+	$(BUILD_DIR)/sparse_crc32.o \
+	$(BUILD_DIR)/sparse_err.o \
+	$(BUILD_DIR)/sparse_read.o \
 	$(BUILD_DIR)/uuid5.o \
 	$(BUILD_DIR)/wipe.o
 
-SPARSE_OBJ := \
-	$(BUILD_DIR)/sparse/backed_block.o \
-	$(BUILD_DIR)/sparse/output_file.o \
-	$(BUILD_DIR)/sparse/sparse.o \
-	$(BUILD_DIR)/sparse/sparse_crc32.o \
-	$(BUILD_DIR)/sparse/sparse_err.o \
-	$(BUILD_DIR)/sparse/sparse_read.o
-
-$(BUILD_DIR)/sparse/%.o: src/libsparse/%.c
+$(BUILD_DIR)/%.o: src/libsparse/%.c
 	mkdir -pv $(BUILD_DIR)/sparse
 	$(CC) $(CFLAGS) -c -o $@ $^
 
@@ -54,7 +52,7 @@ $(BUILD_DIR)/%.o: src/%.c
 	mkdir -pv $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c -o $@ $^
 
-$(BUILD_DIR)/make_ext4fs: $(OBJ) $(SPARSE_OBJ)
+$(BUILD_DIR)/make_ext4fs: $(OBJ)
 	echo "LD_FLAGS=$(LDFLAGS)"
 	echo "ZLIB=$(ZLIB)"
 	$(CC) $(LDFLAGS) -o $@ $^ $(ZLIB)
