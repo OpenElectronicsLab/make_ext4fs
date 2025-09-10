@@ -1,6 +1,14 @@
+2025-09-10  Eric Herman  <eric@freesa.org>
+
+	Add linked list structure for tracking pointers and their sizes
+
+	* src/allocate.c: add vps_list_add(), vps_list_free()
+	* src/allocate.h: add struct vps_list, vps_list_add(), vps_list_free()
+
 2025-09-08  Eric Herman  <eric@freesa.org>
 
 	Elevate leak visibility with Valgrind
+
 	* src/allocate.c: add free_alloc_all, free the strdup-ed filename
 	* src/allocate.h: add free_alloc_all
 	* src/contents.c: adjust the saved_allocation_head from the caller

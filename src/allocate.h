@@ -21,6 +21,13 @@
 
 #include "ext4_utils.h"
 
+struct vps_list;
+struct vps_list {
+	void *p;
+	size_t size;
+	struct vps_list *next;
+};
+
 struct region;
 
 struct region_list {
@@ -88,5 +95,8 @@ int append_oob_allocation(struct fs_aux_info *aux_info, int force,
 			  jmp_buf *setjmp_env, struct block_allocation *alloc,
 			  u32 len);
 void print_blocks(FILE *f, struct block_allocation *alloc);
+void vps_list_add(struct vps_list *vpl, void *data, size_t size,
+		  jmp_buf *setjmp_env);
+size_t vps_list_free(struct vps_list *vpl, int free_contents);
 
 #endif

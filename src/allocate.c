@@ -899,3 +899,39 @@ void free_alloc_all(struct block_allocation *alloc)
 		alloc = ba_next;
 	}
 }
+
+void vps_list_add(struct vps_list *list, void *data, size_t size,
+		  jmp_buf *setjmp_env)
+{
+	if (!list->p) {
+		list->p = data;
+		list->size = size;
+		return;
+	}
+
+	size_t struct_size = sizeof(struct vps_list);
+	struct vps_list *new_list = calloc(1, struct_size);
+	if (!new_list) {
+		critical_error_errno(setjmp_env, "calloc(1, %zu)", struct_size);
+	}
+	new_list->p = data;
+	new_list->size = size;
+	new_list->next = list->next;
+	list->next = new_list;
+}
+
+size_t vps_list_free(struct vps_list *list, int free_contents)
+{
+	size_t total = 0;
+	while (list) {
+		total += sizeof(struct vps_list);
+		struct vps_list *next = list->next;
+		if (free_contents) {
+			total += list->size;
+			free(list->p);
+		}
+		free(list);
+		list = next;
+	}
+	return total;
+}
