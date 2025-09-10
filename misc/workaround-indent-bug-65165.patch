@@ -42,7 +42,7 @@ https://savannah.gnu.org/bugs/index.php?65165
  
  #ifndef _GNU_SOURCE
  #define _GNU_SOURCE
-@@ -197,8 +199,10 @@ int make_ext4fs_internal(struct fs_info *info, struct fs_aux_info *aux_info,
+@@ -199,8 +201,10 @@ int make_ext4fs_internal(struct fs_info *info,
  int read_ext(struct fs_info *info, struct fs_aux_info *aux_info, int force,
  	     jmp_buf *setjmp_env, int fd, int verbose);
  

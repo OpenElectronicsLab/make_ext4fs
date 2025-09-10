@@ -28,12 +28,14 @@
 static u8 *extent_create_backing(struct fs_info *info,
 				 struct sparse_file *ext4_sparse_file,
 				 jmp_buf *setjmp_env,
+				 struct vps_list *long_life_bufs,
 				 struct block_allocation *alloc,
 				 u64 backing_len)
 {
 	u8 *data = calloc(backing_len, 1);
 	if (!data)
 		critical_error_errno(setjmp_env, "calloc(%zu, 1)", backing_len);
+	vps_list_add(long_life_bufs, data, backing_len, setjmp_env);
 
 	u8 *ptr = data;
 	for (; alloc != NULL && backing_len > 0; get_next_region(alloc)) {
@@ -200,6 +202,7 @@ static struct block_allocation *do_inode_allocate_extents(struct fs_info *info, 
 u8 *inode_allocate_data_extents(struct fs_info *info,
 				struct fs_aux_info *aux_info,
 				struct sparse_file *ext4_sparse_file,
+				struct vps_list *long_life_bufs,
 				int force, jmp_buf *setjmp_env,
 				struct ext4_inode *inode, u64 len,
 				u64 backing_len)
@@ -217,7 +220,8 @@ u8 *inode_allocate_data_extents(struct fs_info *info,
 
 	if (backing_len) {
 		data = extent_create_backing(info, ext4_sparse_file,
-					     setjmp_env, alloc, backing_len);
+					     setjmp_env, long_life_bufs,
+					     alloc, backing_len);
 		if (!data)
 			error(force, setjmp_env,
 			      "failed to create backing for %" PRIu64 " bytes",

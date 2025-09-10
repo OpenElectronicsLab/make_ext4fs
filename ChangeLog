@@ -1,9 +1,23 @@
 2025-09-10  Eric Herman  <eric@freesa.org>
 
-	Add linked list structure for tracking pointers and their sizes
+	Freeing backing buffers of sparse files are the responsibility of
+	the caller. As such, a reference must be held in order to free them.
+
+	Add linked list structure for tracking pointers and their sizes.
 
 	* src/allocate.c: add vps_list_add(), vps_list_free()
 	* src/allocate.h: add struct vps_list, vps_list_add(), vps_list_free()
+	* src/contents.c: long_life_bufs param added to functions
+	* src/contents.h: long_life_bufs param added to functions
+	* src/ext4_utils.c: ext4_queue_sb(): backing buf added to long_life_bufs
+	* src/ext4_utils.h: long_life_bufs param added to functions
+	* src/extent.c: extent_create_backing() backing buf added to long_lifes
+	* src/extent.h: long_life_bufs param added to functions
+	* src/indirect.c: inode_attach_resize() add block_data to long_life_bufs
+	* src/indirect.h: long_life_bufs param added to functions
+	* src/make_ext4fs.c: add vps_list long_life_bufs
+	* README.md: Roadmap: remove "add valgrind" (done)
+	* misc/workaround-indent-bug-65165.patch: update
 
 2025-09-08  Eric Herman  <eric@freesa.org>
 

@@ -17,6 +17,8 @@
 #ifndef _DIRECTORY_H_
 #define _DIRECTORY_H_
 
+struct vps_list;
+
 struct dentry {
 	char *path;
 	char *full_path;
@@ -33,7 +35,8 @@ struct dentry {
 };
 
 u32 make_directory(struct fs_info *info, struct fs_aux_info *aux_info,
-		   struct sparse_file *ext4_sparse_file, int force,
+		   struct sparse_file *ext4_sparse_file,
+		   struct vps_list *long_life_bufs, int force,
 		   jmp_buf *setjmp_env, u32 dir_inode_num, u32 entries,
 		   struct dentry *dentries, u32 dirs);
 u32 make_file(struct fs_info *info, struct fs_aux_info *aux_info,

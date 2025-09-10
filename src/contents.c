@@ -86,7 +86,8 @@ static struct ext4_dir_entry_2 *add_dentry(struct fs_info *info,
    when the inode for the entry is allocated.  Returns the inode number of the
    new directory */
 u32 make_directory(struct fs_info *info, struct fs_aux_info *aux_info,
-		   struct sparse_file *ext4_sparse_file, int force,
+		   struct sparse_file *ext4_sparse_file,
+		   struct vps_list *long_life_bufs, int force,
 		   jmp_buf *setjmp_env, u32 dir_inode_num, u32 entries,
 		   struct dentry *dentries, u32 dirs)
 {
@@ -124,9 +125,9 @@ u32 make_directory(struct fs_info *info, struct fs_aux_info *aux_info,
 		error(force, setjmp_env, "failed to get inode %u", inode_num);
 		return EXT4_ALLOCATE_FAILED;
 	}
-
 	data = inode_allocate_data_extents(info, aux_info, ext4_sparse_file,
-					   force, setjmp_env, inode, len, len);
+					   long_life_bufs, force, setjmp_env,
+					   inode, len, len);
 	if (data == NULL) {
 		error(force, setjmp_env, "failed to allocate %u extents", len);
 		return EXT4_ALLOCATE_FAILED;

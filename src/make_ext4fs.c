@@ -47,8 +47,9 @@ static int filter_dot(const struct dirent *d)
 static u32 build_default_directory_structure(struct fs_info *info,
 					     struct fs_aux_info *aux_info,
 					     struct sparse_file
-					     *ext4_sparse_file, int force,
-					     jmp_buf *setjmp_env,
+					     *ext4_sparse_file,
+					     struct vps_list *long_life_bufs,
+					     int force, jmp_buf *setjmp_env,
 					     time_t fixed_time)
 {
 	u32 inode;
@@ -61,10 +62,11 @@ static u32 build_default_directory_structure(struct fs_info *info,
 		.gid = 0,
 		.mtime = (fixed_time != -1) ? fixed_time : 0,
 	};
-	root_inode = make_directory(info, aux_info, ext4_sparse_file, force,
-				    setjmp_env, 0, 1, &dentries, 1);
-	inode = make_directory(info, aux_info, ext4_sparse_file, force,
-			       setjmp_env, root_inode, 0, NULL, 0);
+	root_inode = make_directory(info, aux_info, ext4_sparse_file,
+				    long_life_bufs, force, setjmp_env,
+				    0, 1, &dentries, 1);
+	inode = make_directory(info, aux_info, ext4_sparse_file, long_life_bufs,
+			       force, setjmp_env, root_inode, 0, NULL, 0);
 	*dentries.inode = inode;
 	inode_set_permissions(info, aux_info, ext4_sparse_file, setjmp_env,
 			      inode, dentries.mode, dentries.uid, dentries.gid,
@@ -85,6 +87,7 @@ static u32 build_directory_structure(struct fs_info *info,
 				     struct sparse_file *ext4_sparse_file,
 				     struct block_allocation
 				     **saved_allocation_head,
+				     struct vps_list *long_life_bufs,
 				     struct fs_config_list *config_list,
 				     int force, jmp_buf *setjmp_env,
 				     const char *full_path,
@@ -243,8 +246,9 @@ static u32 build_directory_structure(struct fs_info *info,
 		dirs++;
 	}
 
-	inode = make_directory(info, aux_info, ext4_sparse_file, force,
-			       setjmp_env, dir_inode, entries, dentries, dirs);
+	inode = make_directory(info, aux_info, ext4_sparse_file, long_life_bufs,
+			       force, setjmp_env, dir_inode, entries, dentries,
+			       dirs);
 
 	for (i = 0; i < entries; i++) {
 		if (dentries[i].file_type == EXT4_FT_REG_FILE) {
@@ -272,6 +276,7 @@ static u32 build_directory_structure(struct fs_info *info,
 			entry_inode = build_directory_structure(info, aux_info,
 								ext4_sparse_file,
 								saved_allocation_head,
+								long_life_bufs,
 								config_list,
 								force,
 								setjmp_env,
@@ -456,6 +461,8 @@ int make_ext4fs_internal(struct fs_info *info,
 	struct fs_aux_info *aux_info = NULL;
 	struct sparse_file *ext4_sparse_file = NULL;
 	struct block_allocation *saved_allocation_head = NULL;
+	struct vps_list *long_life_bufs = NULL;
+	size_t size;
 	u32 root_inode_num;
 	u16 root_mode;
 	char *directory = NULL;
@@ -464,13 +471,20 @@ int make_ext4fs_internal(struct fs_info *info,
 
 	memset(setjmp_env, 0x00, sizeof(jmp_buf));
 
-	aux_info = calloc(1, sizeof(struct fs_aux_info));
-	if (!aux_info) {
-		goto make_ext4fs_internal_end;
-	}
-
 	if (setjmp(*setjmp_env))
 		goto make_ext4fs_internal_end;	/* Handle a call to longjmp() */
+
+	size = sizeof(struct vps_list);
+	long_life_bufs = calloc(1, size);
+	if (!long_life_bufs) {
+		critical_error_errno(setjmp_env, "calloc(1, %zu)", size);
+	}
+
+	size = sizeof(struct fs_aux_info);
+	aux_info = calloc(1, size);
+	if (!aux_info) {
+		critical_error_errno(setjmp_env, "calloc(1, %zu)", size);
+	}
 
 	saved_allocation_head = create_allocation(setjmp_env);
 
@@ -563,16 +577,17 @@ int make_ext4fs_internal(struct fs_info *info,
 
 	if (info->feat_compat & EXT4_FEATURE_COMPAT_HAS_JOURNAL)
 		ext4_create_journal_inode(info, aux_info, ext4_sparse_file,
-					  force, setjmp_env);
+					  long_life_bufs, force, setjmp_env);
 
 	if (info->feat_compat & EXT4_FEATURE_COMPAT_RESIZE_INODE)
 		ext4_create_resize_inode(info, aux_info, ext4_sparse_file,
-					 force, setjmp_env);
+					 long_life_bufs, force, setjmp_env);
 
 	if (directory)
 		root_inode_num = build_directory_structure(info, aux_info,
 							   ext4_sparse_file,
 							   &saved_allocation_head,
+							   long_life_bufs,
 							   config_list, force,
 							   setjmp_env,
 							   directory, "", 0,
@@ -582,6 +597,7 @@ int make_ext4fs_internal(struct fs_info *info,
 		root_inode_num = build_default_directory_structure(info,
 								   aux_info,
 								   ext4_sparse_file,
+								   long_life_bufs,
 								   force,
 								   setjmp_env,
 								   fixed_time);
@@ -593,7 +609,8 @@ int make_ext4fs_internal(struct fs_info *info,
 
 	ext4_update_free(aux_info);
 
-	ext4_queue_sb(info, aux_info, ext4_sparse_file, setjmp_env);
+	ext4_queue_sb(info, aux_info, ext4_sparse_file, long_life_bufs,
+		      setjmp_env);
 
 	if (block_list_file) {
 		size_t dirlen = strlen(directory);
@@ -655,6 +672,11 @@ make_ext4fs_internal_end:
 
 	free_alloc_all(saved_allocation_head);
 	saved_allocation_head = NULL;
+
+	size = vps_list_free(long_life_bufs, 1);
+	if (verbose) {
+		printf("Freed %zu bytes of long_life_bufs\n", size);
+	}
 
 	return rval;
 }

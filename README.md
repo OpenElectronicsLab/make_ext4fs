@@ -25,7 +25,7 @@ Noteworthy changes from the OpenWRT version are:
  * added a command-line `-u` option for specifying the UUID
  * default UUID generation now follows rfc9562 version 5 UUIDs
  * no longer requires a loopback device, can now target a file
- * some minor fixes, e.g.: fixed a memory leak that has been there since import
+ * some minor fixes, e.g.: fixed memory leaks that have been there since import
  * added a [ChangeLog](ChangeLog) (includes the excellent work from OpenWRT)
  * moved the sources into the [`src/`](src/) directory
  * added an acceptance test
@@ -55,7 +55,6 @@ Some ideas for future work include:
 * add unit tests (refactor as needed to support this)
 * write some documentation
 * create separate build targets, e.g.: static, debug, coverage
-* add valgrind to tests
 * add code coverage reports
 * consider rename more descriptive name (maybe `make-reproducible-ext4fs`)
 * remove dead code in unused code-paths

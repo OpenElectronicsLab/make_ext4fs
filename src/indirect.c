@@ -533,7 +533,8 @@ void inode_attach_resize(struct fs_info *info, struct fs_aux_info *aux_info,
 			 struct sparse_file *ext4_sparse_file,
 			 int force, jmp_buf *setjmp_env,
 			 struct ext4_inode *inode,
-			 struct block_allocation *alloc)
+			 struct block_allocation *alloc,
+			 struct vps_list *long_life_bufs)
 {
 	u32 block_len = block_allocation_len(alloc);
 	u32 superblocks = block_len / info->bg_desc_reserve_blocks;
@@ -548,11 +549,12 @@ void inode_attach_resize(struct fs_info *info, struct fs_aux_info *aux_info,
 
 	append_oob_allocation(aux_info, force, setjmp_env, alloc, 1);
 	u32 dind_block = get_oob_block(alloc, 0);
-
 	u32 *dind_block_data = calloc(info->block_size, 1);
 	if (!dind_block_data)
 		critical_error_errno(setjmp_env, "calloc(%zu, 1)",
 				     (size_t)info->block_size);
+	vps_list_add(long_life_bufs, dind_block_data, info->block_size,
+		     setjmp_env);
 	sparse_file_add_data(ext4_sparse_file, dind_block_data,
 			     info->block_size, dind_block);
 
@@ -562,6 +564,9 @@ void inode_attach_resize(struct fs_info *info, struct fs_aux_info *aux_info,
 		critical_error_errno(setjmp_env, "calloc(%zu, %zu)",
 				     (size_t)info->block_size,
 				     (size_t)info->bg_desc_reserve_blocks);
+	vps_list_add(long_life_bufs, ind_block_data,
+		     info->block_size * info->bg_desc_reserve_blocks,
+		     setjmp_env);
 	sparse_file_add_data(ext4_sparse_file, ind_block_data,
 			     info->block_size * info->bg_desc_reserve_blocks,
 			     get_block(alloc, 0));

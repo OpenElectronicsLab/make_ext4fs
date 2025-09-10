@@ -44,6 +44,7 @@ extern "C" {
 #include "ext4_sb.h"
 struct sparse_file;
 struct block_allocation;
+struct vps_list;
 
 // TODO: replace stderr with FILE *log
 
@@ -165,14 +166,17 @@ void ext4_fill_in_sb(struct fs_info *info, struct fs_aux_info *aux_info,
 void ext4_create_resize_inode(struct fs_info *info,
 			      struct fs_aux_info *aux_info,
 			      struct sparse_file *ext4_sparse_file,
+			      struct vps_list *long_life_bufs,
 			      int force, jmp_buf *setjmp_env);
 void ext4_create_journal_inode(struct fs_info *info,
 			       struct fs_aux_info *aux_info,
 			       struct sparse_file *ext4_sparse_file,
+			       struct vps_list *long_life_bufs,
 			       int force, jmp_buf *setjmp_env);
 void ext4_update_free(struct fs_aux_info *aux_info);
 void ext4_queue_sb(struct fs_info *info, struct fs_aux_info *aux_info,
-		   struct sparse_file *ext4_sparse_file, jmp_buf *setjmp_env);
+		   struct sparse_file *ext4_sparse_file,
+		   struct vps_list *long_life_bufs, jmp_buf *setjmp_env);
 u64 get_block_device_size(int fd);
 int is_block_device_fd(int fd);
 u64 get_file_size(struct fs_info *info, int fd);

@@ -323,7 +323,8 @@ void ext4_fill_in_sb(struct fs_info *info, struct fs_aux_info *aux_info,
 }
 
 void ext4_queue_sb(struct fs_info *info, struct fs_aux_info *aux_info,
-		   struct sparse_file *ext4_sparse_file, jmp_buf *setjmp_env)
+		   struct sparse_file *ext4_sparse_file,
+		   struct vps_list *long_life_bufs, jmp_buf *setjmp_env)
 {
 	/* The write_data* functions expect only block aligned calls.
 	 * This is not an issue, except when we write out the super
@@ -336,6 +337,7 @@ void ext4_queue_sb(struct fs_info *info, struct fs_aux_info *aux_info,
 			critical_error_errno(setjmp_env, "calloc(%zu, 1)",
 					     (size_t)info->block_size);
 		}
+		vps_list_add(long_life_bufs, buf, info->block_size, setjmp_env);
 		memcpy(buf + 1024, (u8 *)aux_info->sb, 1024);
 		sparse_file_add_data(ext4_sparse_file, buf, info->block_size,
 				     0);
@@ -367,6 +369,7 @@ void ext4_parse_sb_info(struct fs_info *info, struct fs_aux_info *aux_info,
 void ext4_create_resize_inode(struct fs_info *info,
 			      struct fs_aux_info *aux_info,
 			      struct sparse_file *ext4_sparse_file,
+			      struct vps_list *long_life_bufs,
 			      int force, jmp_buf *setjmp_env)
 {
 	struct block_allocation *reserve_inode_alloc =
@@ -396,7 +399,7 @@ void ext4_create_resize_inode(struct fs_info *info,
 	}
 
 	inode_attach_resize(info, aux_info, ext4_sparse_file, force, setjmp_env,
-			    inode, reserve_inode_alloc);
+			    inode, reserve_inode_alloc, long_life_bufs);
 
 	inode->i_mode = S_IFREG | S_IRUSR | S_IWUSR;
 	inode->i_links_count = 1;
@@ -409,6 +412,7 @@ void ext4_create_resize_inode(struct fs_info *info,
 void ext4_create_journal_inode(struct fs_info *info,
 			       struct fs_aux_info *aux_info,
 			       struct sparse_file *ext4_sparse_file,
+			       struct vps_list *long_life_bufs,
 			       int force, jmp_buf *setjmp_env)
 {
 	struct ext4_inode *inode = get_inode(info, aux_info, ext4_sparse_file,
@@ -419,7 +423,9 @@ void ext4_create_journal_inode(struct fs_info *info,
 	}
 
 	u8 *journal_data = inode_allocate_data_extents(info, aux_info,
-						       ext4_sparse_file, force,
+						       ext4_sparse_file,
+						       long_life_bufs,
+						       force,
 						       setjmp_env, inode,
 						       info->journal_blocks *
 						       info->block_size,

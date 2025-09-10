@@ -34,6 +34,7 @@ u8 *inode_allocate_data_indirect(struct fs_info *info,
 void inode_attach_resize(struct fs_info *info, struct fs_aux_info *aux_info,
 			 struct sparse_file *ext4_sparse_file, int force,
 			 jmp_buf *setjmp_env, struct ext4_inode *inode,
-			 struct block_allocation *alloc);
+			 struct block_allocation *alloc,
+			 struct vps_list *long_life_bufs);
 
 #endif
