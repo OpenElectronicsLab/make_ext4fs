@@ -1,3 +1,26 @@
+2024-07-20  Eric Herman  <eric@freesa.org>
+
+	Align uuid v5 generation with rfc9562
+	support using a file (in addition to device) for target
+	move file truncation until after file size check
+	support BUILD_DIR
+	fix declare-but-not-used warnings
+	add a .gitignore
+	Makefile: add "check" target
+	rename uuid.h,uuid.c to uuid5.h, uuid5.c
+
+	* make_ext4fs_main.c: remove file truncation on open
+	* make_ext4fs.c: file truncation after getting file size
+	* build-and-test.sh: support BUILD_DIR, file or device
+	* Makefile: add a "check" for both file/device, BUILD_DIR, whitespace
+	* libsparse/Makefile: BUILD_DIR
+	* canned_fs_config.c: fix unused warning
+	* make_ext4fs.c: fix unused warning
+	* uuid.h: rename to uuid5.h
+	* uuid.c: Align with rfc9562, rename to uuid5.c
+	* build-and-test.sh: called from "make check"
+	* .gitignore: added
+
 2024-05-06  Eric Herman  <eric@freesa.org>
 
 	make_ext4fs: add command-line -u option for UUID
