@@ -199,6 +199,7 @@ tidy:
 		-T output_file \
 		-T u8 -T u16 -T u32 -T u64 \
 		-T u_int32_t \
+		-T CHAR64LONG16 \
 		`find src -name '*.h' -o -name '*.c'`
 	patch -Rp1 -i misc/workaround-indent-bug-65165.patch
 

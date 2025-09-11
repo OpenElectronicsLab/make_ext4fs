@@ -82,7 +82,7 @@ void do_R4(u_int32_t *a, u_int32_t *b, u_int32_t *c, u_int32_t *d, u_int32_t *e,
 
 void
 do_R01(u_int32_t *a, u_int32_t *b, u_int32_t *c, u_int32_t *d, u_int32_t *e,
-       CHAR64LONG16 * block)
+       CHAR64LONG16 *block)
 {
 	nR0(a, b, c, d, e, 0);
 	nR0(e, a, b, c, d, 1);
@@ -108,7 +108,7 @@ do_R01(u_int32_t *a, u_int32_t *b, u_int32_t *c, u_int32_t *d, u_int32_t *e,
 
 void
 do_R2(u_int32_t *a, u_int32_t *b, u_int32_t *c, u_int32_t *d, u_int32_t *e,
-      CHAR64LONG16 * block)
+      CHAR64LONG16 *block)
 {
 	nR2(a, b, c, d, e, 20);
 	nR2(e, a, b, c, d, 21);
@@ -134,7 +134,7 @@ do_R2(u_int32_t *a, u_int32_t *b, u_int32_t *c, u_int32_t *d, u_int32_t *e,
 
 void
 do_R3(u_int32_t *a, u_int32_t *b, u_int32_t *c, u_int32_t *d, u_int32_t *e,
-      CHAR64LONG16 * block)
+      CHAR64LONG16 *block)
 {
 	nR3(a, b, c, d, e, 40);
 	nR3(e, a, b, c, d, 41);
@@ -160,7 +160,7 @@ do_R3(u_int32_t *a, u_int32_t *b, u_int32_t *c, u_int32_t *d, u_int32_t *e,
 
 void
 do_R4(u_int32_t *a, u_int32_t *b, u_int32_t *c, u_int32_t *d, u_int32_t *e,
-      CHAR64LONG16 * block)
+      CHAR64LONG16 *block)
 {
 	nR4(a, b, c, d, e, 60);
 	nR4(e, a, b, c, d, 61);
@@ -206,7 +206,7 @@ const u_char buffer[64];
 	block = &workspace;
 	(void)memcpy(block, buffer, 64);
 #else
-	block = (CHAR64LONG16 *) (void *)buffer;
+	block = (CHAR64LONG16 *)(void *)buffer;
 #endif
 
 	/* Copy context->state[] to working vars */

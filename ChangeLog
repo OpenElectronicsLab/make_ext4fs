@@ -3,7 +3,8 @@
 	Makefile: add check-has-sudo before calling scripts which require sudo
 	and add targets "debug" and "coverage-report".
 
-	* Makefile: check-has-sudo target, debug and coverage-report targets
+	* Makefile: targets: check-has-sudo, coverage-report; tidy:CHAR64LONG16
+	* src/sha1.c: white-space tidy, CHAR64LONG16 is a type
 	* tests/build-and-test.sh: support coverage target
 	* README.md: code coverage moved from Roadmap to Noteworthy changes
 	* .gitignore: add default ./build dir
