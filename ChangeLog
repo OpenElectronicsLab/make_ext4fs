@@ -6,6 +6,8 @@
 	Honour the order of argumetns to calloc:
 		calloc(number_of_elements, size_of_element);
 
+	uuid5: add ability to be strict (UUID) or lax (char *) with namespaces
+
 	* Makefile: targets: check-has-sudo, coverage-report; tidy:CHAR64LONG16
 	* src/allocate.c: calloc
 	* src/ext4_utils.c: calloc
@@ -17,6 +19,8 @@
 	* src/libsparse/sparse_read.c: calloc
 	* src/make_ext4fs.c: calloc
 	* src/sha1.c: white-space tidy, CHAR64LONG16 is a type
+	* src/uuid5.c: add ability to be strict or lax with namespaces
+	* src/uuid5.h: add ability to be strict or lax with namespaces
 	* tests/build-and-test.sh: support coverage target
 	* README.md: code coverage moved from Roadmap to Noteworthy changes
 	* .gitignore: add default ./build dir

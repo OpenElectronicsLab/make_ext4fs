@@ -21,21 +21,23 @@
 #include "uuid5.h"
 
 static void sha1_hash(unsigned char sha1[SHA1_DIGEST_LENGTH],
-		      const char *namespace, const char *name)
+		      const uint8_t *namespace, size_t namespace_len,
+		      const uint8_t *name, size_t name_len)
 {
 	SHA1_CTX ctx;
 	SHA1Init(&ctx);
-	SHA1Update(&ctx, (const uint8_t *)namespace, strlen(namespace));
-	SHA1Update(&ctx, (const uint8_t *)name, strlen(name));
+	SHA1Update(&ctx, namespace, namespace_len);
+	SHA1Update(&ctx, name, name_len);
 	SHA1Final(sha1, &ctx);
 }
 
 /* see https://www.ietf.org/rfc/rfc9562.pdf */
-void uuid5_generate(uint8_t dest[16], const char *namespace, const char *name)
+void uuid5(uint8_t dest[16], const uint8_t *namespace, size_t namespace_len,
+	   const uint8_t *name, size_t name_len)
 {
 	unsigned char sha1[SHA1_DIGEST_LENGTH];
 
-	sha1_hash(sha1, namespace, name);
+	sha1_hash(sha1, namespace, namespace_len, name, name_len);
 	memcpy(dest, sha1, 16);
 
 	const size_t version_byte = 6;
@@ -49,4 +51,10 @@ void uuid5_generate(uint8_t dest[16], const char *namespace, const char *name)
 	// then set variant to 2 (0b10)
 	dest[variant_byte] &= 0x3F;
 	dest[variant_byte] |= (2 << 6);
+}
+
+void uuid5_generate(uint8_t dest[16], const char *namespace, const char *name)
+{
+	uuid5(dest, (const uint8_t *)namespace, strlen(namespace),
+	      (const uint8_t *)name, strlen(name));
 }

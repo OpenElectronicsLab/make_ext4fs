@@ -18,7 +18,16 @@
 #define UUID5_H
 
 #include <stdint.h>
+#include <stddef.h>
 
+/* see https://www.ietf.org/rfc/rfc9562.pdf */
+/* proper version 5 UUIDs are created from a namespace which is itself a UUID,
+ * thus the namespace_len should be 16 */
+void uuid5(uint8_t dest[16], const uint8_t *namespace, size_t namespace_len,
+	   const uint8_t *name, size_t name_len);
+
+/* the uuid5_generate relaxes the constraint for the namespace to be a UUID,
+ * and it may be any number of bytes */
 void uuid5_generate(uint8_t dest[16], const char *namespace, const char *name);
 
 #endif
