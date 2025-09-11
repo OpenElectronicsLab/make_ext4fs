@@ -2,7 +2,7 @@
 # Copyright (C) 2015 Jo-Philipp Wich <jow@openwrt.org>
 # Modifications:
 # Copyright (C) 2020 Hauke Mehrtens <hauke@hauke-m.de>
-# Copyright (C) 2024 Eric Herman <eric@freesa.org>
+# Copyright (C) 2024-2025 Eric Herman <eric@freesa.org>
 
 CC ?= gcc
 # -pedantic -Wc++-compat -Wcast-qual
@@ -57,13 +57,22 @@ $(BUILD_DIR)/make_ext4fs: $(OBJ)
 	echo "ZLIB=$(ZLIB)"
 	$(CC) $(LDFLAGS) -o $@ $^ $(ZLIB)
 
+.PHONY:check-has-sudo
+check-has-sudo:
+	id | tr ',' '\n' | grep 'root\|sudo\|wheel' \
+		|| id | tr ',' '\n'
+	sudo env | grep -i sudo
+	@echo SUCCESS $@
+
 .PHONY:check-device
-check-device: tests/build-and-test.sh $(BUILD_DIR)/make_ext4fs
+check-device: tests/build-and-test.sh $(BUILD_DIR)/make_ext4fs \
+		check-has-sudo
 	BUILD_DIR=$(BUILD_DIR) $<
 	@echo SUCCESS $@
 
 .PHONY: check-blockfile
-check-blockfile: tests/build-and-test.sh $(BUILD_DIR)/make_ext4fs
+check-blockfile: tests/build-and-test.sh $(BUILD_DIR)/make_ext4fs \
+		check-has-sudo
 	DIRECT_BLOCKFILE=1 BUILD_DIR=$(BUILD_DIR) $<
 	@echo SUCCESS $@
 

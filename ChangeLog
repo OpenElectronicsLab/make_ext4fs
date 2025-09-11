@@ -1,3 +1,9 @@
+2025-09-11  Eric Herman  <eric@freesa.org>
+
+	Makefile: add check-has-sudo before calling scripts which require sudo
+
+	* Makefile: check-has-sudo target
+
 2025-09-10  Eric Herman  <eric@freesa.org>
 
 	Freeing backing buffers of sparse files are the responsibility of
