@@ -3,7 +3,19 @@
 	Makefile: add check-has-sudo before calling scripts which require sudo
 	and add targets "debug" and "coverage-report".
 
+	Honour the order of argumetns to calloc:
+		calloc(number_of_elements, size_of_element);
+
 	* Makefile: targets: check-has-sudo, coverage-report; tidy:CHAR64LONG16
+	* src/allocate.c: calloc
+	* src/ext4_utils.c: calloc
+	* src/extent.c: calloc
+	* src/indirect.c: calloc
+	* src/libsparse/backed_block.c: calloc
+	* src/libsparse/output_file.c: calloc
+	* src/libsparse/sparse.c: calloc
+	* src/libsparse/sparse_read.c: calloc
+	* src/make_ext4fs.c: calloc
 	* src/sha1.c: white-space tidy, CHAR64LONG16 is a type
 	* tests/build-and-test.sh: support coverage target
 	* README.md: code coverage moved from Roadmap to Noteworthy changes

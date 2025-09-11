@@ -161,9 +161,9 @@ void ext4_init_fs_aux_info(struct fs_info *info, struct fs_aux_info *aux_info,
 		aux_info->len_blocks -= last_group_size;
 	}
 
-	aux_info->sb = calloc(info->block_size, 1);
+	aux_info->sb = calloc(1, info->block_size);
 	if (!aux_info->sb) {
-		critical_error_errno(setjmp_env, "calloc(%zu, 1)",
+		critical_error_errno(setjmp_env, "calloc(1, %zu)",
 				     (size_t)info->block_size);
 	}
 
@@ -174,11 +174,11 @@ void ext4_init_fs_aux_info(struct fs_info *info, struct fs_aux_info *aux_info,
 				     (size_t)aux_info->groups, sizeof(char *));
 	}
 
-	aux_info->bg_desc = calloc(info->block_size, aux_info->bg_desc_blocks);
+	aux_info->bg_desc = calloc(aux_info->bg_desc_blocks, info->block_size);
 	if (!aux_info->bg_desc) {
 		critical_error_errno(setjmp_env, "calloc(%zu, %zu)",
-				     (size_t)info->block_size,
-				     (size_t)aux_info->bg_desc_blocks);
+				     (size_t)aux_info->bg_desc_blocks,
+				     (size_t)info->block_size);
 	}
 	aux_info->xattrs = NULL;
 }
@@ -281,10 +281,10 @@ void ext4_fill_in_sb(struct fs_info *info, struct fs_aux_info *aux_info,
 		if (ext4_bg_has_super_block(info, i)) {
 			if (i != 0) {
 				aux_info->backup_sb[i] =
-				    calloc(info->block_size, 1);
+				    calloc(1, info->block_size);
 				if (!aux_info->backup_sb[i]) {
 					critical_error_errno(setjmp_env,
-							     "calloc(%zu, 1)",
+							     "calloc(1, %zu)",
 							     (size_t)
 							     info->block_size);
 				}
@@ -332,9 +332,9 @@ void ext4_queue_sb(struct fs_info *info, struct fs_aux_info *aux_info,
 	 * deal with that here.
 	 */
 	if (info->block_size > 1024) {
-		u8 *buf = calloc(info->block_size, 1);
+		u8 *buf = calloc(1, info->block_size);
 		if (!buf) {
-			critical_error_errno(setjmp_env, "calloc(%zu, 1)",
+			critical_error_errno(setjmp_env, "calloc(1, %zu)",
 					     (size_t)info->block_size);
 		}
 		vps_list_add(long_life_bufs, buf, info->block_size, setjmp_env);

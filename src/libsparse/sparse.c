@@ -29,7 +29,7 @@
 
 struct sparse_file *sparse_file_new(unsigned int block_size, int64_t len)
 {
-	struct sparse_file *s = calloc(sizeof(struct sparse_file), 1);
+	struct sparse_file *s = calloc(1, sizeof(struct sparse_file));
 	if (!s) {
 		return NULL;
 	}

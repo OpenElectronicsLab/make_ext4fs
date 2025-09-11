@@ -36,9 +36,9 @@ static u8 *create_backing(struct fs_info *info,
 			       "indirect backing larger than %d blocks",
 			       EXT4_NDIR_BLOCKS);
 
-	u8 *data = calloc(backing_len, 1);
+	u8 *data = calloc(1, backing_len);
 	if (!data)
-		critical_error_errno(setjmp_env, "calloc(%zu, 1)", backing_len);
+		critical_error_errno(setjmp_env, "calloc(1, %zu)", backing_len);
 
 	u8 *ptr = data;
 	for (; alloc != NULL && backing_len > 0; get_next_region(alloc)) {
@@ -137,9 +137,9 @@ static void fill_dindirect_block(struct fs_info *info,
 
 		dind_block[i] = ind_block;
 
-		u32 *ind_block_data = calloc(info->block_size, 1);
+		u32 *ind_block_data = calloc(1, info->block_size);
 		if (!ind_block_data) {
-			critical_error_errno(setjmp_env, "calloc(%zu,1)",
+			critical_error_errno(setjmp_env, "calloc(1, %zu)",
 					     (size_t)info->block_size);
 		}
 		sparse_file_add_data(ext4_sparse_file, ind_block_data,
@@ -177,9 +177,9 @@ static void fill_tindirect_block(struct fs_info *info,
 
 		tind_block[i] = dind_block;
 
-		u32 *dind_block_data = calloc(info->block_size, 1);
+		u32 *dind_block_data = calloc(1, info->block_size);
 		if (!dind_block_data) {
-			critical_error_errno(setjmp_env, "calloc(%zu, 1)",
+			critical_error_errno(setjmp_env, "calloc(1, %zu)",
 					     (size_t)info->block_size);
 		}
 		sparse_file_add_data(ext4_sparse_file, dind_block_data,
@@ -239,9 +239,9 @@ static int inode_attach_indirect_blocks(struct fs_info *info,
 		return -1;
 	}
 
-	u32 *ind_block_data = calloc(info->block_size, 1);
+	u32 *ind_block_data = calloc(1, info->block_size);
 	if (!ind_block_data) {
-		critical_error_errno(setjmp_env, "calloc(%zu, 1)",
+		critical_error_errno(setjmp_env, "calloc(1, %zu)",
 				     (size_t)info->block_size);
 	}
 	sparse_file_add_data(ext4_sparse_file, ind_block_data, info->block_size,
@@ -280,9 +280,9 @@ static int inode_attach_dindirect_blocks(struct fs_info *info,
 		return -1;
 	}
 
-	u32 *dind_block_data = calloc(info->block_size, 1);
+	u32 *dind_block_data = calloc(1, info->block_size);
 	if (!dind_block_data) {
-		critical_error_errno(setjmp_env, "calloc(%zu, 1)",
+		critical_error_errno(setjmp_env, "calloc(1, %zu)",
 				     (size_t)info->block_size);
 	}
 	sparse_file_add_data(ext4_sparse_file, dind_block_data,
@@ -322,9 +322,9 @@ static int inode_attach_tindirect_blocks(struct fs_info *info,
 		return -1;
 	}
 
-	u32 *tind_block_data = calloc(info->block_size, 1);
+	u32 *tind_block_data = calloc(1, info->block_size);
 	if (!tind_block_data) {
-		critical_error_errno(setjmp_env, "calloc(%zu, 1)",
+		critical_error_errno(setjmp_env, "calloc(1, %zu)",
 				     (size_t)info->block_size);
 	}
 	sparse_file_add_data(ext4_sparse_file, tind_block_data,
@@ -549,9 +549,9 @@ void inode_attach_resize(struct fs_info *info, struct fs_aux_info *aux_info,
 
 	append_oob_allocation(aux_info, force, setjmp_env, alloc, 1);
 	u32 dind_block = get_oob_block(alloc, 0);
-	u32 *dind_block_data = calloc(info->block_size, 1);
+	u32 *dind_block_data = calloc(1, info->block_size);
 	if (!dind_block_data)
-		critical_error_errno(setjmp_env, "calloc(%zu, 1)",
+		critical_error_errno(setjmp_env, "calloc(1, %zu)",
 				     (size_t)info->block_size);
 	vps_list_add(long_life_bufs, dind_block_data, info->block_size,
 		     setjmp_env);
@@ -559,11 +559,11 @@ void inode_attach_resize(struct fs_info *info, struct fs_aux_info *aux_info,
 			     info->block_size, dind_block);
 
 	u32 *ind_block_data =
-	    calloc(info->block_size, info->bg_desc_reserve_blocks);
+	    calloc(info->bg_desc_reserve_blocks, info->block_size);
 	if (!ind_block_data)
 		critical_error_errno(setjmp_env, "calloc(%zu, %zu)",
-				     (size_t)info->block_size,
-				     (size_t)info->bg_desc_reserve_blocks);
+				     (size_t)info->bg_desc_reserve_blocks,
+				     (size_t)info->block_size);
 	vps_list_add(long_life_bufs, ind_block_data,
 		     info->block_size * info->bg_desc_reserve_blocks,
 		     setjmp_env);

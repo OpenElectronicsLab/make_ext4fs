@@ -205,9 +205,9 @@ static u32 build_directory_structure(struct fs_info *info,
 			dentries[i].file_type = EXT4_FT_SOCK;
 		} else if (S_ISLNK(stat.st_mode)) {
 			dentries[i].file_type = EXT4_FT_SYMLINK;
-			dentries[i].link = calloc(info->block_size, 1);
+			dentries[i].link = calloc(1, info->block_size);
 			if (!dentries[i].link) {
-				critical_error(setjmp_env, "calloc(%zu, 1)",
+				critical_error(setjmp_env, "calloc(1, %zu)",
 					       (size_t)info->block_size);
 			}
 			readlink(dentries[i].full_path, dentries[i].link,

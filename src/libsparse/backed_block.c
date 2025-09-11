@@ -123,7 +123,7 @@ void backed_block_destroy(struct backed_block *bb)
 struct backed_block_list *backed_block_list_new(unsigned int block_size)
 {
 	struct backed_block_list *b =
-	    calloc(sizeof(struct backed_block_list), 1);
+	    calloc(1, sizeof(struct backed_block_list));
 	if (!b)
 		return NULL;
 	b->block_size = block_size;

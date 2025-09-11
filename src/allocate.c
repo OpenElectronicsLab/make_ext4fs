@@ -327,9 +327,9 @@ static void init_bg(struct fs_info *info, struct fs_aux_info *aux_info,
 		header_blocks +=
 		    1 + aux_info->bg_desc_blocks + info->bg_desc_reserve_blocks;
 
-	bg->bitmaps = calloc(info->block_size, 2);
+	bg->bitmaps = calloc(2, info->block_size);
 	if (!bg->bitmaps) {
-		critical_error_errno(setjmp_env, "calloc(%zu, 2)",
+		critical_error_errno(setjmp_env, "calloc(2, %zu)",
 				     (size_t)info->block_size);
 	}
 	bg->block_bitmap = bg->bitmaps;
@@ -375,11 +375,11 @@ void block_allocator_init(struct fs_info *info, struct fs_aux_info *aux_info,
 	size_t i;
 
 	aux_info->bgs =
-	    calloc(sizeof(struct block_group_info), aux_info->groups);
+	    calloc(aux_info->groups, sizeof(struct block_group_info));
 	if (aux_info->bgs == NULL)
 		critical_error_errno(setjmp_env, "calloc(%zu, %zu)",
-				     sizeof(struct block_group_info),
-				     (size_t)aux_info->groups);
+				     (size_t)aux_info->groups,
+				     sizeof(struct block_group_info));
 
 	for (i = 0; i < aux_info->groups; i++)
 		init_bg(info, aux_info, ext4_sparse_file, force, setjmp_env, i);
@@ -775,7 +775,7 @@ struct ext4_xattr_header *get_xattr_block_for_inode(struct fs_info *info, struct
 		return block;
 
 	u32 block_num = allocate_block(aux_info, force, setjmp_env);
-	block = calloc(info->block_size, 1);
+	block = calloc(1, info->block_size);
 	if (block == NULL) {
 		error(force, setjmp_env, "get_xattr: failed to allocate %d",
 		      info->block_size);

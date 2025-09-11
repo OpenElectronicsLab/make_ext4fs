@@ -218,7 +218,7 @@ static int process_crc32_chunk(int fd, unsigned int chunk_size, uint32_t crc32)
 
 static int process_chunk(struct sparse_file *s, int fd, off_t offset,
 			 unsigned int chunk_hdr_sz,
-			 chunk_header_t * chunk_header, unsigned int cur_block,
+			 chunk_header_t *chunk_header, unsigned int cur_block,
 			 uint32_t *crc_ptr, char *copybuf, size_t copybuf_size)
 {
 	int ret;

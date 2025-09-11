@@ -32,9 +32,9 @@ static u8 *extent_create_backing(struct fs_info *info,
 				 struct block_allocation *alloc,
 				 u64 backing_len)
 {
-	u8 *data = calloc(backing_len, 1);
+	u8 *data = calloc(1, backing_len);
 	if (!data)
-		critical_error_errno(setjmp_env, "calloc(%zu, 1)", backing_len);
+		critical_error_errno(setjmp_env, "calloc(1, %zu)", backing_len);
 	vps_list_add(long_life_bufs, data, backing_len, setjmp_env);
 
 	u8 *ptr = data;
@@ -134,9 +134,9 @@ static struct block_allocation *do_inode_allocate_extents(struct fs_info *info, 
 		idx->ei_leaf_hi = 0;
 		idx->ei_unused = 0;
 
-		u8 *data = calloc(info->block_size, 1);
+		u8 *data = calloc(1, info->block_size);
 		if (!data)
-			critical_error_errno(setjmp_env, "calloc(%zu, 1)",
+			critical_error_errno(setjmp_env, "calloc(1, %zu)",
 					     (size_t)info->block_size);
 
 		sparse_file_add_data(ext4_sparse_file, data, info->block_size,

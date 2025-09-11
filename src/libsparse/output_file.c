@@ -548,13 +548,13 @@ static int output_file_init(struct output_file *out, int block_size,
 	out->crc32 = 0;
 	out->use_crc = crc;
 
-	out->zero_buf = calloc(block_size, 1);
+	out->zero_buf = calloc(1, block_size);
 	if (!out->zero_buf) {
 		error_errno("malloc zero_buf");
 		return -ENOMEM;
 	}
 
-	out->fill_buf = calloc(block_size, 1);
+	out->fill_buf = calloc(1, block_size);
 	if (!out->fill_buf) {
 		error_errno("malloc fill_buf");
 		ret = -ENOMEM;
