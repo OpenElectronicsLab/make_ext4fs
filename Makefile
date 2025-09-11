@@ -44,7 +44,7 @@ SHELL=/bin/bash
 
 # -pedantic -Wc++-compat -Wcast-qual
 COMMON_CFLAGS := -g -Wall -Wextra \
- -Isrc/include -Isrc/libsparse -Isrc/libsparse/include \
+ -Isrc -Isrc/include -Isrc/libsparse -Isrc/libsparse/include \
  $(CFLAGS)
 
 BUILD_CFLAGS=$(COMMON_CFLAGS)
@@ -81,7 +81,6 @@ OBJ :=	\
 	extent.o \
 	indirect.o \
 	make_ext4fs.o \
-	make_ext4fs_main.o \
 	output_file.o \
 	sha1.o \
 	sparse.o \
@@ -109,11 +108,23 @@ $(BUILD_DIR)/%.o: src/libsparse/%.c | $(BUILD_DIR)/
 $(BUILD_DIR)/%.o: src/%.c | $(BUILD_DIR)/
 	$(CC) $(CURRENT_CFLAGS) -c -o $@ $<
 
+$(BUILD_DIR)/tests/test-%: tests/test-%.c \
+		$(patsubst %, $(BUILD_DIR)/%, $(OBJ)) \
+		| $(BUILD_DIR)/tests/
+	$(CC) $(CURRENT_CFLAGS) $(LDFLAGS) -Itests -o $@ $^ $(LDADD)
+
+
 $(DEBUG_DIR)/%.o: src/libsparse/%.c | $(DEBUG_DIR)/
 	$(CC) $(CURRENT_CFLAGS) -c -o $@ $<
 
 $(DEBUG_DIR)/%.o: src/%.c | $(DEBUG_DIR)/
 	$(CC) $(CURRENT_CFLAGS) -c -o $@ $<
+
+$(DEBUG_DIR)/tests/test-%: tests/test-%.c \
+		$(patsubst %, $(DEBUG_DIR)/%, $(OBJ)) \
+		| $(DEBUG_DIR)/tests/
+	$(CC) $(CURRENT_CFLAGS) $(LDFLAGS) -Itests -o $@ $^ $(LDADD)
+
 
 $(COVER_DIR)/%.o: src/libsparse/%.c | $(COVER_DIR)/
 	$(CC) $(CURRENT_CFLAGS) -c -o $@ $<
@@ -121,7 +132,13 @@ $(COVER_DIR)/%.o: src/libsparse/%.c | $(COVER_DIR)/
 $(COVER_DIR)/%.o: src/%.c | $(COVER_DIR)/
 	$(CC) $(CURRENT_CFLAGS) -c -o $@ $<
 
-%/make_ext4fs: $(foreach obj,$(OBJ),%/$(obj)) | %/
+$(COVER_DIR)/tests/test-%: tests/test-%.c \
+		$(patsubst %, $(COVER_DIR)/%, $(OBJ)) \
+		| $(COVER_DIR)/tests/
+	$(CC) $(CURRENT_CFLAGS) $(LDFLAGS) -Itests -o $@ $^ $(LDADD)
+
+
+%/make_ext4fs: %/make_ext4fs_main.o $(foreach obj,$(OBJ),%/$(obj)) | %/
 	@echo "LD_FLAGS=$(LDFLAGS)"
 	@echo "ZLIB=$(ZLIB)"
 	$(CC) $(CURRENT_LDFLAGS) -o $@ $^ $(LDADD)
@@ -154,12 +171,54 @@ check-blockfile: tests/build-and-test.sh $(BUILD_DIR)/make_ext4fs \
 		$<
 	@echo SUCCESS $@
 
-.PHONY: check
-check: check-device check-blockfile
+
+UNIT_TESTS= \
+	test-uuid5-generate.c \
+	test-uuid5.c
+
+.PRECIOUS: \
+	$(BUILD_DIR)/tests/test-uuid5 \
+	$(BUILD_DIR)/tests/test-uuid5-generate \
+	$(DEBUG_DIR)/tests/test-uuid5 \
+	$(DEBUG_DIR)/tests/test-uuid5-generate \
+	$(COVER_DIR)/tests/test-uuid5 \
+	$(COVER_DIR)/tests/test-uuid5-generate
+
+
+check-build-%: $(BUILD_DIR)/tests/test-%
+	$<
+	@echo SUCCESS $@
+
+.PHONY: check-build-unit
+check-build-unit: $(patsubst test-%.c, check-build-%, $(UNIT_TESTS))
 	@echo SUCCESS $@
 
 
-$(COVER_DIR)/coverage.info: tests/build-and-test.sh
+check-debug-%: $(DEBUG_DIR)/tests/test-%
+	$<
+	@echo SUCCESS $@
+
+.PHONY: check-debug-unit
+check-debug-unit: $(patsubst test-%.c, check-debug-%, $(UNIT_TESTS))
+	@echo SUCCESS $@
+
+
+check-cover-%: $(COVER_DIR)/tests/test-%
+	$<
+	@echo SUCCESS $@
+
+.PHONY: check-cover-unit
+check-cover-unit: $(patsubst test-%.c, check-cover-%, $(UNIT_TESTS))
+	@echo SUCCESS $@
+
+.PHONY: check
+check: check-build-unit check-device check-blockfile
+	@echo SUCCESS $@
+
+
+$(COVER_DIR)/coverage.info: \
+		check-cover-unit \
+		tests/build-and-test.sh
 	VERBOSE=1 \
 		DIRECT_BLOCKFILE=1 \
 		BUILD_DIR=$(BUILD_DIR) \
@@ -200,7 +259,7 @@ tidy:
 		-T u8 -T u16 -T u32 -T u64 \
 		-T u_int32_t \
 		-T CHAR64LONG16 \
-		`find src -name '*.h' -o -name '*.c'`
+		`find src tests -name '*.h' -o -name '*.c'`
 	patch -Rp1 -i misc/workaround-indent-bug-65165.patch
 
 .PHONY: clean

@@ -1,7 +1,7 @@
 2025-09-11  Eric Herman  <eric@freesa.org>
 
 	Makefile: add check-has-sudo before calling scripts which require sudo
-	and add targets "debug" and "coverage-report".
+	and add targets "debug", "check-build-unit", and "coverage-report".
 
 	Honour the order of argumetns to calloc:
 		calloc(number_of_elements, size_of_element);
@@ -9,6 +9,7 @@
 	uuid5: add ability to be strict (UUID) or lax (char *) with namespaces
 
 	* Makefile: targets: check-has-sudo, coverage-report; tidy:CHAR64LONG16
+			and support unit tests
 	* src/allocate.c: calloc
 	* src/ext4_utils.c: calloc
 	* src/extent.c: calloc
@@ -22,6 +23,8 @@
 	* src/uuid5.c: add ability to be strict or lax with namespaces
 	* src/uuid5.h: add ability to be strict or lax with namespaces
 	* tests/build-and-test.sh: support coverage target
+	* tests/test-uuid5-generate.c: new file, first unit test!
+	* tests/test-uuid5.c: new file, unit test
 	* README.md: code coverage moved from Roadmap to Noteworthy changes
 	* .gitignore: add default ./build dir
 
