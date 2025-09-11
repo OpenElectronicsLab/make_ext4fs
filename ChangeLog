@@ -1,3 +1,46 @@
+2024-07-25  Eric Herman  <eric@freesa.org>
+
+	added licenses to makefiles
+	moved top-level source files to src/
+	moved top-level test file to tests/
+	default the build/ directory
+
+	* Makefile: add license, BUILD_DIR ?= ./build
+	* libsparse/Makefile: add license, BUILD_DIR ?= ../build
+	* build-and-test.sh: move to tests/ add license comment
+	* ChangeLog: added
+	* .gitignore: updated
+	* allocate.c: moved to src/allocate.c
+	* allocate.h: moved to src/allocate.h
+	* canned_fs_config.c: moved to src/canned_fs_config.c
+	* canned_fs_config.h: moved to src/canned_fs_config.h
+	* contents.c: moved to src/contents.c
+	* contents.h: moved to src/contents.h
+	* crc16.c: moved to src/crc16.c
+	* ext4.h: moved to src/ext4.h
+	* ext4_extents.h: moved to src/ext4_extents.h
+	* ext4_kernel_headers.h: moved to src/ext4_kernel_headers.h
+	* ext4_sb.c: moved to src/ext4_sb.c
+	* ext4_sb.h: moved to src/ext4_sb.h
+	* ext4_utils.c: moved to src/ext4_utils.c
+	* ext4_utils.h: moved to src/ext4_utils.h
+	* ext4fixup.c: moved to src/ext4fixup.c
+	* ext4fixup.h: moved to src/ext4fixup.h
+	* extent.c: moved to src/extent.c
+	* extent.h: moved to src/extent.h
+	* indirect.c: moved to src/indirect.c
+	* indirect.h: moved to src/indirect.h
+	* jbd2.h: moved to src/jbd2.h
+	* make_ext4fs.c: moved to src/make_ext4fs.c
+	* make_ext4fs_main.c: moved to src/make_ext4fs_main.c
+	* sha1.c: moved to src/sha1.c
+	* sha1.h: moved to src/sha1.h
+	* uuid5.c: moved to src/uuid5.c
+	* uuid5.h: moved to src/uuid5.h
+	* wipe.c: moved to src/wipe.c
+	* wipe.h: moved to src/wipe.h
+	* xattr.h: moved to src/xattr.h
+
 2024-07-20  Eric Herman  <eric@freesa.org>
 
 	Align uuid v5 generation with rfc9562
