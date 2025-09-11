@@ -29,6 +29,7 @@ Noteworthy changes from the OpenWRT version are:
  * added a [ChangeLog](ChangeLog) (includes the excellent work from OpenWRT)
  * moved the sources into the [`src/`](src/) directory
  * added an acceptance test
+ * add code coverage report
  * added this README
 
 ## Building
@@ -54,8 +55,6 @@ Some ideas for future work include:
 
 * add unit tests (refactor as needed to support this)
 * write some documentation
-* create separate build targets, e.g.: static, debug, coverage
-* add code coverage reports
 * consider rename more descriptive name (maybe `make-reproducible-ext4fs`)
 * remove dead code in unused code-paths
 * review allocations in `--force` conditions for missing calls to `free()`

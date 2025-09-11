@@ -19,27 +19,55 @@
 # FOO :::= bar	# variables defined with ‘:::=’ are immediately expanded
 # FOO ?= bar	# variable to be set to a value only if it’s not already set
 #
+# foreach
+# https://www.gnu.org/software/make/manual/html_node/Foreach-Function.html
+#
 # patsubst : $(patsubst pattern,replacement,text)
 #       https://www.gnu.org/software/make/manual/html_node/Text-Functions.html
+#
+# Target-specific Variable syntax:
+# https://www.gnu.org/software/make/manual/html_node/Target_002dspecific.html
 
 
 CC ?= gcc
+BUILD_DIR ?= ./build
+DEBUG_DIR ?= $(BUILD_DIR)/debug
+COVER_DIR ?= $(BUILD_DIR)/cover
+
+.PHONY: default debug coverage all
+default: $(BUILD_DIR)/make_ext4fs
+debug: $(DEBUG_DIR)/make_ext4fs
+coverage: $(COVER_DIR)/make_ext4fs
+all: default debug coverage
+
+SHELL=/bin/bash
+
 # -pedantic -Wc++-compat -Wcast-qual
-CFLAGS := -g -Wall -Wextra \
+COMMON_CFLAGS := -g -Wall -Wextra \
  -Isrc/include -Isrc/libsparse -Isrc/libsparse/include \
  $(CFLAGS)
 
-BUILD_DIR ?= ./build
+BUILD_CFLAGS=$(COMMON_CFLAGS)
+DEBUG_CFLAGS=$(COMMON_CFLAGS) -Werror # -save-temps
+COVER_CFLAGS=-O0 $(COMMON_CFLAGS) -Werror \
+        -fno-inline-small-functions \
+        -fkeep-inline-functions \
+        -fkeep-static-functions \
+        -fprofile-arcs \
+        -ftest-coverage \
+        --coverage
 
-default: $(BUILD_DIR)/make_ext4fs
+COVERAGE_LDFLAGS=--coverage
 
 # extracted from https://github.com/torvalds/linux/blob/master/scripts/Lindent
 LINDENT = indent -npro -kr -i8 -ts8 -sob -l80 -ss -ncs -cp1 -il0
+# see also: https://www.kernel.org/doc/Documentation/process/coding-style.rst
 
 ZLIB := -lz
 ifeq ($(STATIC),1)
 	ZLIB += -Wl,-Bstatic -Wl,-Bdynamic
 endif
+LDADD += $(ZLIB)
 
 OBJ :=	\
 	allocate.o \
@@ -63,19 +91,40 @@ OBJ :=	\
 	uuid5.o \
 	wipe.o
 
-$(BUILD_DIR):
-	mkdir -pv $(BUILD_DIR)
+# Target-specific variable assignments
+$(BUILD_DIR)/% : CURRENT_CFLAGS = $(BUILD_CFLAGS)
+$(DEBUG_DIR)/% : CURRENT_CFLAGS = $(DEBUG_CFLAGS)
+$(COVER_DIR)/% : CURRENT_CFLAGS = $(COVER_CFLAGS)
 
-$(BUILD_DIR)/%.o: src/libsparse/%.c | $(BUILD_DIR)
-	$(CC) $(CFLAGS) -c -o $@ $^
+$(BUILD_DIR)/% : CURRENT_LDFLAGS = $(LDFLAGS)
+$(DEBUG_DIR)/% : CURRENT_LDFLAGS = $(LDFLAGS)
+$(COVER_DIR)/% : CURRENT_LDFLAGS = --coverage $(LDFLAGS)
 
-$(BUILD_DIR)/%.o: src/%.c | $(BUILD_DIR)
-	$(CC) $(CFLAGS) -c -o $@ $^
+%/:
+	mkdir -pv $@
 
-$(BUILD_DIR)/make_ext4fs: $(patsubst %, $(BUILD_DIR)/%, $(OBJ)) | $(BUILD_DIR)
+$(BUILD_DIR)/%.o: src/libsparse/%.c | $(BUILD_DIR)/
+	$(CC) $(CURRENT_CFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/%.o: src/%.c | $(BUILD_DIR)/
+	$(CC) $(CURRENT_CFLAGS) -c -o $@ $<
+
+$(DEBUG_DIR)/%.o: src/libsparse/%.c | $(DEBUG_DIR)/
+	$(CC) $(CURRENT_CFLAGS) -c -o $@ $<
+
+$(DEBUG_DIR)/%.o: src/%.c | $(DEBUG_DIR)/
+	$(CC) $(CURRENT_CFLAGS) -c -o $@ $<
+
+$(COVER_DIR)/%.o: src/libsparse/%.c | $(COVER_DIR)/
+	$(CC) $(CURRENT_CFLAGS) -c -o $@ $<
+
+$(COVER_DIR)/%.o: src/%.c | $(COVER_DIR)/
+	$(CC) $(CURRENT_CFLAGS) -c -o $@ $<
+
+%/make_ext4fs: $(foreach obj,$(OBJ),%/$(obj)) | %/
 	@echo "LD_FLAGS=$(LDFLAGS)"
 	@echo "ZLIB=$(ZLIB)"
-	$(CC) $(LDFLAGS) -o $@ $^ $(ZLIB)
+	$(CC) $(CURRENT_LDFLAGS) -o $@ $^ $(LDADD)
 
 .PHONY:check-has-sudo
 check-has-sudo:
@@ -87,17 +136,53 @@ check-has-sudo:
 .PHONY:check-device
 check-device: tests/build-and-test.sh $(BUILD_DIR)/make_ext4fs \
 		check-has-sudo
-	BUILD_DIR=$(BUILD_DIR) $<
+	VERBOSE=1 \
+		BUILD_DIR=$(BUILD_DIR) \
+		DEBUG_DIR=$(DEBUG_DIR) \
+		COVER_DIR=$(COVER_DIR) \
+		$<
 	@echo SUCCESS $@
 
 .PHONY: check-blockfile
 check-blockfile: tests/build-and-test.sh $(BUILD_DIR)/make_ext4fs \
 		check-has-sudo
-	DIRECT_BLOCKFILE=1 BUILD_DIR=$(BUILD_DIR) $<
+	VERBOSE=1 \
+		DIRECT_BLOCKFILE=1 \
+		BUILD_DIR=$(BUILD_DIR) \
+		DEBUG_DIR=$(DEBUG_DIR) \
+		COVER_DIR=$(COVER_DIR) \
+		$<
 	@echo SUCCESS $@
 
 .PHONY: check
 check: check-device check-blockfile
+	@echo SUCCESS $@
+
+
+$(COVER_DIR)/coverage.info: tests/build-and-test.sh
+	VERBOSE=1 \
+		DIRECT_BLOCKFILE=1 \
+		BUILD_DIR=$(BUILD_DIR) \
+		DEBUG_DIR=$(DEBUG_DIR) \
+		COVER_DIR=$(COVER_DIR) \
+		BUILD_TYPE=cover \
+		tests/build-and-test.sh
+	lcov    --checksum \
+                --capture \
+                --base-directory . \
+                --directory $(COVER_DIR) \
+                --output-file $(COVER_DIR)/coverage.info
+	@echo SUCCESS $@
+
+$(COVER_DIR)/coverage_html/src/index.html: $(COVER_DIR)/coverage.info
+	genhtml $< --output-directory $(COVER_DIR)/coverage_html
+	@echo SUCCESS $@
+
+.PHONY: coverage-report
+coverage-report: \
+		$(COVER_DIR)/coverage.info \
+		$(COVER_DIR)/coverage_html/src/index.html
+	ls -l $^
 	@echo SUCCESS $@
 
 .PHONY: tidy
@@ -119,5 +204,4 @@ tidy:
 
 .PHONY: clean
 clean:
-	rm -rfv $(OBJ) $(BUILD_DIR)/make_ext4fs $(BUILD_DIR)/*.o \
-		$(BUILD_DIR)/sparse $(BUILD_DIR)/test-???? ./build
+	rm -rfv $(BUILD_DIR)/* $(DEBUG_DIR)/* $(COVER_DIR)/*

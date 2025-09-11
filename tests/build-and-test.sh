@@ -28,14 +28,39 @@ fi
 
 
 if [ -z "$BUILD_DIR" ]; then
-	export BUILD_DIR=.
+	export BUILD_DIR=build
 fi
-mkdir -pv $BUILD_DIR
+if [ -z "$DEBUG_DIR" ]; then
+	export DEBUG_DIR=$BUILD_DIR/debug
+fi
+if [ -z "$COVER_DIR" ]; then
+	export COVER_DIR=$BUILD_DIR/cover
+fi
 
-TEST_DIR=$( mktemp --tmpdir=$BUILD_DIR --directory test-XXXX )
+echo "BUILD_TYPE=$BUILD_TYPE"
+if [ -z "$BUILD_TYPE" ] ; then
+	BUILD_TYPE=build
+fi
+echo "BUILD_TYPE=$BUILD_TYPE"
 
-export CFLAGS="-Wall -Wextra $CFLAGS"
-make BUILD_DIR=$TEST_DIR
+if [ "$BUILD_TYPE" == 'build' ];  then
+	mkdir -pv $BUILD_DIR
+	MK_TARGET=default
+	TEST_DIR=$( mktemp --tmpdir=$BUILD_DIR --directory test-XXXX )
+	EXE=$BUILD_DIR/make_ext4fs
+elif [ "$BUILD_TYPE" == 'debug' ]; then
+	mkdir -pv $DEBUG_DIR
+	MK_TARGET=debug
+	TEST_DIR=$( mktemp --tmpdir=$DEBUG_DIR --directory test-XXXX )
+	EXE=$DEBUG_DIR/make_ext4fs
+elif [ "$BUILD_TYPE" == 'cover' ]; then
+	mkdir -pv $COVER_DIR
+	MK_TARGET=coverage
+	TEST_DIR=$( mktemp --tmpdir=$COVER_DIR --directory test-XXXX )
+	EXE=$COVER_DIR/make_ext4fs
+fi
+
+make $MK_TARGET
 
 dd if=/dev/zero of=$TEST_DIR/blockfile bs=1M count=128
 
@@ -72,7 +97,7 @@ echo "foo" > $TEST_DIR/test-fs-files/foo.txt
 mkdir -pv $TEST_DIR/test-out
 
 FS_EPOCH=1
-sudo $VALGRIND $TEST_DIR/make_ext4fs -v \
+sudo $VALGRIND $EXE -v \
 	-T $FS_EPOCH \
 	-L test-fs-foo \
 	-u "$UUID_IN" \
