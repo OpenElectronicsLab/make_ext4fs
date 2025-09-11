@@ -4,6 +4,25 @@
 # Copyright (C) 2020 Hauke Mehrtens <hauke@hauke-m.de>
 # Copyright (C) 2024-2025 Eric Herman <eric@freesa.org>
 
+
+# $@ : target label
+# $< : the first prerequisite after the colon
+# $^ : all of the prerequisite files
+# $* : wildcard matched part
+#
+# https://www.gnu.org/software/make/manual/html_node/Prerequisite-Types.html
+# targets : normal-prerequisites | order-only-prerequisites
+#
+# https://www.gnu.org/software/make/manual/html_node/Setting.html
+# FOO = bar	# variables defined with ‘=’ are recursively expanded
+# FOO := bar	# variables defined with ‘:=’ are simply expanded
+# FOO :::= bar	# variables defined with ‘:::=’ are immediately expanded
+# FOO ?= bar	# variable to be set to a value only if it’s not already set
+#
+# patsubst : $(patsubst pattern,replacement,text)
+#       https://www.gnu.org/software/make/manual/html_node/Text-Functions.html
+
+
 CC ?= gcc
 # -pedantic -Wc++-compat -Wcast-qual
 CFLAGS := -g -Wall -Wextra \
@@ -23,38 +42,39 @@ ifeq ($(STATIC),1)
 endif
 
 OBJ :=	\
-	$(BUILD_DIR)/allocate.o \
-	$(BUILD_DIR)/backed_block.o \
-	$(BUILD_DIR)/canned_fs_config.o \
-	$(BUILD_DIR)/contents.o \
-	$(BUILD_DIR)/crc16.o \
-	$(BUILD_DIR)/ext4_sb.o \
-	$(BUILD_DIR)/ext4_utils.o \
-	$(BUILD_DIR)/ext4fixup.o \
-	$(BUILD_DIR)/extent.o \
-	$(BUILD_DIR)/indirect.o \
-	$(BUILD_DIR)/make_ext4fs.o \
-	$(BUILD_DIR)/make_ext4fs_main.o \
-	$(BUILD_DIR)/output_file.o \
-	$(BUILD_DIR)/sha1.o \
-	$(BUILD_DIR)/sparse.o \
-	$(BUILD_DIR)/sparse_crc32.o \
-	$(BUILD_DIR)/sparse_err.o \
-	$(BUILD_DIR)/sparse_read.o \
-	$(BUILD_DIR)/uuid5.o \
-	$(BUILD_DIR)/wipe.o
+	allocate.o \
+	backed_block.o \
+	canned_fs_config.o \
+	contents.o \
+	crc16.o \
+	ext4_sb.o \
+	ext4_utils.o \
+	ext4fixup.o \
+	extent.o \
+	indirect.o \
+	make_ext4fs.o \
+	make_ext4fs_main.o \
+	output_file.o \
+	sha1.o \
+	sparse.o \
+	sparse_crc32.o \
+	sparse_err.o \
+	sparse_read.o \
+	uuid5.o \
+	wipe.o
 
-$(BUILD_DIR)/%.o: src/libsparse/%.c
-	mkdir -pv $(BUILD_DIR)/sparse
-	$(CC) $(CFLAGS) -c -o $@ $^
-
-$(BUILD_DIR)/%.o: src/%.c
+$(BUILD_DIR):
 	mkdir -pv $(BUILD_DIR)
+
+$(BUILD_DIR)/%.o: src/libsparse/%.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c -o $@ $^
 
-$(BUILD_DIR)/make_ext4fs: $(OBJ)
-	echo "LD_FLAGS=$(LDFLAGS)"
-	echo "ZLIB=$(ZLIB)"
+$(BUILD_DIR)/%.o: src/%.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c -o $@ $^
+
+$(BUILD_DIR)/make_ext4fs: $(patsubst %, $(BUILD_DIR)/%, $(OBJ)) | $(BUILD_DIR)
+	@echo "LD_FLAGS=$(LDFLAGS)"
+	@echo "ZLIB=$(ZLIB)"
 	$(CC) $(LDFLAGS) -o $@ $^ $(ZLIB)
 
 .PHONY:check-has-sudo
