@@ -108,10 +108,14 @@ $(BUILD_DIR)/%.o: src/libsparse/%.c | $(BUILD_DIR)/
 $(BUILD_DIR)/%.o: src/%.c | $(BUILD_DIR)/
 	$(CC) $(CURRENT_CFLAGS) -c -o $@ $<
 
-$(BUILD_DIR)/tests/test-%: tests/test-%.c \
+$(BUILD_DIR)/tests/test-%: tests/test-%.c $(BUILD_DIR)/tests/check-util.o \
 		$(patsubst %, $(BUILD_DIR)/%, $(OBJ)) \
 		| $(BUILD_DIR)/tests/
 	$(CC) $(CURRENT_CFLAGS) $(LDFLAGS) -Itests -o $@ $^ $(LDADD)
+
+$(BUILD_DIR)/tests/check-util.o: tests/check-util.c tests/check-util.h \
+		| $(BUILD_DIR)/tests/
+	$(CC) $(CURRENT_CFLAGS) -Itests -c -o $@ $<
 
 
 $(DEBUG_DIR)/%.o: src/libsparse/%.c | $(DEBUG_DIR)/
@@ -120,10 +124,14 @@ $(DEBUG_DIR)/%.o: src/libsparse/%.c | $(DEBUG_DIR)/
 $(DEBUG_DIR)/%.o: src/%.c | $(DEBUG_DIR)/
 	$(CC) $(CURRENT_CFLAGS) -c -o $@ $<
 
-$(DEBUG_DIR)/tests/test-%: tests/test-%.c \
+$(DEBUG_DIR)/tests/test-%: tests/test-%.c $(DEBUG_DIR)/tests/check-util.o \
 		$(patsubst %, $(DEBUG_DIR)/%, $(OBJ)) \
 		| $(DEBUG_DIR)/tests/
 	$(CC) $(CURRENT_CFLAGS) $(LDFLAGS) -Itests -o $@ $^ $(LDADD)
+
+$(DEBUG_DIR)/tests/check-util.o: tests/check-util.c tests/check-util.h \
+		| $(DEBUG_DIR)/tests/
+	$(CC) $(CURRENT_CFLAGS) -Itests -c -o $@ $<
 
 
 $(COVER_DIR)/%.o: src/libsparse/%.c | $(COVER_DIR)/
@@ -132,10 +140,14 @@ $(COVER_DIR)/%.o: src/libsparse/%.c | $(COVER_DIR)/
 $(COVER_DIR)/%.o: src/%.c | $(COVER_DIR)/
 	$(CC) $(CURRENT_CFLAGS) -c -o $@ $<
 
-$(COVER_DIR)/tests/test-%: tests/test-%.c \
+$(COVER_DIR)/tests/test-%: tests/test-%.c $(COVER_DIR)/tests/check-util.o \
 		$(patsubst %, $(COVER_DIR)/%, $(OBJ)) \
 		| $(COVER_DIR)/tests/
 	$(CC) $(CURRENT_CFLAGS) $(LDFLAGS) -Itests -o $@ $^ $(LDADD)
+
+$(COVER_DIR)/tests/check-util.o: tests/check-util.c tests/check-util.h \
+		| $(COVER_DIR)/tests/
+	$(CC) $(CURRENT_CFLAGS) -Itests -c -o $@ $<
 
 
 %/make_ext4fs: %/make_ext4fs_main.o $(foreach obj,$(OBJ),%/$(obj)) | %/
@@ -173,14 +185,18 @@ check-blockfile: tests/build-and-test.sh $(BUILD_DIR)/make_ext4fs \
 
 
 UNIT_TESTS= \
+	test-check-util.c \
 	test-uuid5-generate.c \
 	test-uuid5.c
 
 .PRECIOUS: \
+	$(BUILD_DIR)/tests/test-check-util \
 	$(BUILD_DIR)/tests/test-uuid5 \
 	$(BUILD_DIR)/tests/test-uuid5-generate \
+	$(DEBUG_DIR)/tests/test-check-util \
 	$(DEBUG_DIR)/tests/test-uuid5 \
 	$(DEBUG_DIR)/tests/test-uuid5-generate \
+	$(COVER_DIR)/tests/test-check-util \
 	$(COVER_DIR)/tests/test-uuid5 \
 	$(COVER_DIR)/tests/test-uuid5-generate
 

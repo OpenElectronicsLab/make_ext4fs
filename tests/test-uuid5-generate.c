@@ -3,6 +3,7 @@
 
 #include "uuid5.h"
 #include "ext4_utils.h"
+#include "check-util.h"
 
 #include <stdio.h>
 #include <stddef.h>
@@ -20,11 +21,7 @@ int main(void)
 
 	char *result = uuid_bin_to_str(buf, sizeof(buf), bytes);
 
-	if (strcmp(result, expected) != 0) {
-		++errors;
-		fprintf(stderr, "expected '%s'\n"
-			" but was '%s'\n", expected, result);
-	}
+	errors += Check_str(expected, result);
 
 	return errors ? EXIT_FAILURE : EXIT_SUCCESS;
 }
